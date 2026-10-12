@@ -119,6 +119,13 @@ fixed upstream references in [UPSTREAM.md](UPSTREAM.md).
 
 ## Comparison and evidence boundaries
 
+The five accepted model/placement runs and the 280-test local suite belong
+to the published
+[59c9bcd snapshot](https://github.com/tjwlstj/cellivane-seed/commit/59c9bcd).
+The current comparison launcher's source collection now explicitly lists its
+sixteen-file family. Retaining that count does not preserve the modified
+launcher's hash or validate the new optional capability/resource modules.
+
 The original Windows CPU smoke used llamafile 0.10.5 and Qwen3-0.6B Q8_0,
 then compared a Seed reference response with an Ollama subengine. Its three
 exact-answer samples passed only one of three expected strings. That is
@@ -145,8 +152,11 @@ benchmark. Cache-hit latency must stay separate from actual generation.
 Strata is a design reference for explicit hardware ownership and bounded
 data movement. Its model-specific MoE expert-cache and multi-GPU layer
 pipeline are different from this dense-backend profile. No upstream Strata
-code is copied here, and Seed has no MTP, speculative token verifier,
-cross-engine KV sharing or independently implemented tensor kernel.
+code is copied here. Seed has no native MTP, live target-token verifier,
+cross-engine KV sharing or independently implemented tensor kernel. The new
+experimental draft path delegates drafting and target verification to the
+pinned external llama.cpp backend; its independent Python verifier replays
+recorded evidence rather than generating or verifying model tokens itself.
 
 The bridge's explicit `kind="strata"` remains fail closed because owned
 Strata process/model qualification is not implemented. An available HTTP
@@ -154,3 +164,81 @@ service named Strata cannot qualify its default mock as a real reference.
 An unqualified reference dispatches no generation. Native Kernel Room
 management authority, ABI changes, streaming and actual multi-GPU support
 remain outside this standalone experimental project.
+
+## Contract, budget and speculation follow-up
+
+The current development slice separates a validated backend contract,
+requested resource budget, executable plan, observed execution and
+independent verdict. The contract must say what a backend can actually do;
+a profile name or resource estimate cannot create that capability. A budget
+is a planning/admission constraint, not a claim of OS-enforced memory or
+VRAM isolation. Missing measurements remain unknown.
+
+[BackendCapabilities](../hosted/experimental/cellivane_seed/capabilities.py)
+and [resource admission](../hosted/experimental/cellivane_seed/resources.py)
+are **PARTIAL**, with 26 pure fixture tests passed. `none`, `draft` and
+`ngram` are planner modes; this adapter contract permits only `none` for
+Ollama/llamafile and all three declarations for llama.cpp. Caller-supplied
+observed labels require both evidence and exact demand identity; they do
+not authenticate an engine. The plan returns `ADMITTED`, `BLOCKED` or
+`UNKNOWN`. Full target/draft file bytes plus declared host overhead and
+context workspace are counted in RAM even for GPU placement. GPU demand
+requires its own byte estimate and provenance hash; missing estimates stay
+`UNKNOWN`, with no file-size/layer-ratio VRAM inference.
+
+The [plan CLI](../tools/hosted/cellivane_seed_plan.py) passed six synthetic
+fixtures. It hashes local GGUF bytes and prints a plan without launching or
+contacting a backend. It does not inspect the GGUF architecture or provide
+model compatibility proof. It creates no observed labels, so
+`--require-observed` remains `UNKNOWN`. See the
+[field and CLI contract](DEVELOPMENT_GUIDE.md#implemented-planner-contract)
+for exact inputs and exit meanings.
+
+The separate [CPU experiment launcher](../tools/hosted/cellivane_seed_speculate.py)
+now configures the pinned backend's `none` and `draft-simple` paths, starts a
+fresh owned server per phase and alternates their order by round. CPU-only
+target/draft execution uses four threads, context 2048, greedy draft sampling
+and no prompt/result reuse. Source, both model hashes and all prepared assets
+are rechecked before each phase and again after it. This detects changes at
+those boundaries; it is not atomic filesystem/loader attestation.
+
+Two diagnostics failed and their original source/logs remain preserved.
+The producer now uses backend `--reasoning-format auto` to extract empty
+thinking delimiters. Seed/bridge response validation remains unchanged and
+rejects nonempty reasoning; no answer normalization bypass was added. Raw
+worker log bytes and hashes are retained. Only a derived observation view
+uses UTF-8 replacement decoding, and speculative counters require complete
+ASCII lines; HTTP JSON still requires strict UTF-8. See the
+[experiment procedure](DEVELOPMENT_GUIDE.md#cpu-speculation-launcher-and-replay)
+and [results owner](SPECULATION.md).
+
+The second failure classified a pinned backend's nonfatal differential
+template probe as fatal. Only its exact nine-line `lstrip` probe context is
+now retained as a warning; other error/fatal records still reject acceptance.
+Neither original failed run is promoted to PASS.
+
+Experiment wall time includes HTTP, prefill and generation under verbosity-5
+TRACE logging; it is not decoder-only throughput or production speedup.
+Corpus timings exclude warmup, while phase draft counters include it.
+Conservative counter bounds do not bind native task IDs to HTTP requests.
+
+The accepted repeat-three run completed six phases, 24 timed responses and six
+warmups. All twelve paired texts matched, and independent source-checked replay
+passed. Draft logs recorded 444 offered / 366 accepted tokens including warmup.
+The median per-pair OFF/ON wall-time ratio was 1.1974; this is an advisory
+small-corpus observation for the specified CPU/model pair. Source, model and
+backend-asset checks matched at all six phase boundaries, and recorded owned
+Job cleanup and port closure were confirmed.
+The owned primary process peak working set increased from about 4.35 GiB OFF
+to 5.22 GiB ON; the additional draft model did not save memory. These counters
+are not whole-system DRAM/VRAM accounting or enforced memory limits.
+Seed's result cache and same-key coalescing do not implement token drafting,
+and Strata's model-specific native MTP is not inherited by a dense backend.
+Actual external-backend speculation was observed; generalized backend
+qualification, endpoint-PID attestation and quality claims remain false.
+The final local Windows regression passed 385 tests with zero skips in
+29.307 seconds. Verify terminal fixture-workflow results for the exact
+published revision separately from these local results;
+the [development guide](DEVELOPMENT_GUIDE.md#current-slice-contract-budget-and-speculation)
+owns that acceptance boundary. Earlier comparison PASS results do not
+validate this changed source or extend this bounded speculation result.

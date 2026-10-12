@@ -15,6 +15,8 @@ inference implementation. Model weights and engine binaries are not bundled.
 Read the [architecture](docs/ARCHITECTURE.md),
 [upstream references and model hashes](docs/UPSTREAM.md), and
 [bounded model/placement comparison](docs/BENCHMARKS.md).
+The [development guide](docs/DEVELOPMENT_GUIDE.md) owns the workflow for
+contracts, resource budgets and new actual-run acceptance.
 
 ## What is implemented / 구현 범위
 
@@ -29,7 +31,7 @@ Read the [architecture](docs/ARCHITECTURE.md),
 - An owned Windows Ollama comparison path with `cpu`, `hybrid`, and `auto`
   placement plans, separate observed-layer evidence, and a fixed small corpus.
 
-No token MTP, training, cross-process KV sharing, tool calls, streaming, or
+No native token MTP, training, cross-process KV sharing, tool calls, streaming, or
 automatic native Kernel Room binding is implemented. Cache/coalescing avoids
 duplicate requests; it is not speculative token decoding. CPU and one-GPU
 placement were observed in bounded local runs. General GPU qualification and
@@ -54,10 +56,15 @@ passed [Windows and Ubuntu CI](https://github.com/tjwlstj/cellivane-seed/actions
 run does not validate the newer comparison/profile additions; their final CI
 must be checked at the corresponding published source revision.
 
-The expanded comparison/profile source passed the final local Windows suite:
+The `59c9bcd` comparison/profile snapshot passed its final local Windows suite:
 280 tests, zero skips, 28.110 seconds, including 45 comparison-verifier
 positive/negative fixtures. Actual model results and their separate replay
 are described in [BENCHMARKS.md](docs/BENCHMARKS.md).
+
+The newer contract/budget/speculation slice passed 385 local Windows tests,
+zero skips, in 29.307 seconds. Check terminal fixture-workflow results for the
+exact published revision; local regression and actual-run replay are separate
+from GitHub CI.
 
 ## Attach a local backend / 기존 로컬 backend 연결
 
@@ -163,6 +170,41 @@ prompt/KV reuse may affect timing. See [BENCHMARKS.md](docs/BENCHMARKS.md)
 and its [allowlisted aggregate JSON](docs/benchmarks/2026-10-12-summary.json)
 for timing scope, provenance, run hashes and limits. Raw prompts, answers,
 logs, local paths and process IDs are kept outside the public repository.
+Those five runs belong to the
+[59c9bcd source snapshot](https://github.com/tjwlstj/cellivane-seed/commit/59c9bcd).
+The current comparison launcher now declares an explicit sixteen-file source
+closure; its changed bytes and the new planner need their own validation.
+
+## Current development slice / 현재 고도화 방향
+
+The capability/resource planner and the non-executing
+[plan CLI](tools/hosted/cellivane_seed_plan.py) are **PARTIAL**: 26 pure
+contract/budget fixtures and six CLI fixtures passed. Caller-supplied byte
+budgets and workspace estimates are mandatory; absent GPU estimates or
+required observations stay `UNKNOWN`. `ADMITTED` is declared preflight,
+not measured memory fit or engine qualification. The specified CPU speculative
+OFF/ON experiment and its independent recorded-evidence replay passed, along
+with the 385-test local Windows suite described in the
+[development guide](docs/DEVELOPMENT_GUIDE.md#current-slice-contract-budget-and-speculation).
+Existing model/placement results remain evidence for their original source.
+Token speculation, router prefetch and quantized computation are separate
+mechanisms; result caching is not any of those three.
+
+The separate [CPU speculation launcher](tools/hosted/cellivane_seed_speculate.py)
+uses the pinned llama.cpp b11429 Windows CPU binary, official Qwen3-4B Q8_0
+target and Qwen3-0.6B Q8_0 draft. It alternates fresh-server `none` and
+`draft-simple` phases with greedy draft sampling, no Seed result cache and
+disabled backend prompt reuse. It requires explicit local asset/storage
+roots and both model files. The accepted repeat-three run completed six phases,
+24 timed responses and six warmups. All 12 OFF/ON text pairs matched; independent
+replay passed and observed 444 offered / 366 accepted draft tokens including
+warmup. The median per-pair wall-time ratio was 1.1974 (OFF/ON), an advisory
+small-corpus result under TRACE collection. Both earlier failed diagnostics
+remain preserved. Check terminal CI for the exact published revision. Use the
+[launcher and verifier instructions](docs/DEVELOPMENT_GUIDE.md#cpu-speculation-launcher-and-replay)
+and [SPECULATION.md](docs/SPECULATION.md) for this experiment. This backend
+draft-model path does not implement Strata's native MTP, establish answer
+correctness or promise production speedup.
 
 ## Evidence and limits / 증거와 한계
 

@@ -99,9 +99,12 @@ def acceptance_checks(summary):
 
 
 def source_hashes():
-    paths = []
-    for name in ("cellivane_seed", "cellivane_bridge"):
-        paths.extend((REPO / "hosted/experimental" / name).glob("*.py"))
+    # This experiment's frozen family does not import optional acceleration
+    # modules. Keep its sixteen-file closure aligned with its independent replay.
+    paths = [REPO / "hosted/experimental/cellivane_seed" / (name + ".py")
+             for name in ("__init__", "__main__", "core", "server", "placement", "ollama")]
+    paths.extend(REPO / "hosted/experimental/cellivane_bridge" / (name + ".py")
+                 for name in ("__init__", "__main__", "adapters", "cli", "contracts", "runtime", "storage"))
     paths.extend(REPO / "tools/hosted" / name for name in (
         "cellivane_seed_compare.py", "cellivane_seed_lab.py", "cellivane_bridge_lab.py"))
     return {p.relative_to(REPO).as_posix(): lab.digest(p) for p in sorted(paths)}

@@ -55,6 +55,28 @@ is not Seed's exact-result cache or in-flight coalescing. Cellivane adopts
 the general idea of explicit responsibility/placement reporting, while
 leaving tensor placement to an established dense-model backend.
 
+Three upstream mechanisms need separate names. Strata's
+[MTP contract](https://github.com/Niko1221/Strata/blob/7695859aa13afb248bdb4d36f9b2e95707db079d/include/strata/core/mtp.hpp#L3-L17)
+drafts future token candidates for target verification. Its
+[routing-aware prefetch contract](https://github.com/Niko1221/Strata/blob/7695859aa13afb248bdb4d36f9b2e95707db079d/include/strata/core/expert_source.hpp#L240-L262)
+predicts expert identifiers to prepare data before a layer needs it. Its
+[quantized formats](https://github.com/Niko1221/Strata/blob/7695859aa13afb248bdb4d36f9b2e95707db079d/include/strata/artifact/dequant.hpp#L68-L94)
+define how stored low-bit codes and scales are interpreted for computation.
+MTP does not predict decompressed model weights. Grouped token verification
+can share work or amortize expert movement; that connection does not make
+token speculation an SSD decompressor. Quantized MMQ may compute without
+expanding a whole weight matrix to FP16, as described in the pinned
+[DETAILS.md](https://github.com/Niko1221/Strata/blob/7695859aa13afb248bdb4d36f9b2e95707db079d/docs/DETAILS.md).
+
+Cellivane's new contract/budget and actual speculation experiment follow the
+[development guide](DEVELOPMENT_GUIDE.md). The pure declared-budget planner
+is `PARTIAL`; the specified CPU OFF/ON run and its independent recorded-evidence
+replay passed, and the final local Windows suite passed 385 tests with zero
+skips in 29.307 seconds. Publication CI must be checked for the exact published
+revision, independently of those local results.
+Reading these upstream mechanisms does not import code or qualify a backend;
+the local result does not establish general performance support.
+
 ## CPU/GPU backend references
 
 The [llama.cpp server controls at d812350](https://github.com/ggml-org/llama.cpp/blob/d81235049384534c167caea52b85a694f6103d14/tools/server/README.md)
@@ -67,7 +89,33 @@ merely requesting zero GPU layers. The stable v0.6.0 release points to
 [nightly b11429](https://github.com/ggml-org/llama.cpp/releases/tag/b11429);
 the latest nightly observed during this review was
 [b11559](https://github.com/ggml-org/llama.cpp/releases/tag/b11559).
-Neither binary was installed or qualified by this research.
+The first review installed neither binary. The new experiment selects the
+b11429 Windows CPU archive through the stable v0.6.0 pointer and the
+[pinned asset helper](../tools/hosted/cellivane_llama_assets.py); b11559 is
+only a research reference. Preparing verified bytes is not actual-model
+qualification. The new OFF/ON path has two preserved failed diagnostics and a
+separate accepted repeat-three CPU run with independent source-checked replay.
+
+| New experimental binary | Official fixed distribution | Bytes | SHA-256 |
+|---|---|---:|---|
+| llama.cpp b11429 Windows CPU x64 | [ZIP](https://github.com/ggml-org/llama.cpp/releases/download/b11429/llama-b11429-bin-win-cpu-x64.zip) | 19398918 | `1283323272b04cd07905816a597a0da810918102de958f4ff6f7bbaa70ed2efe` |
+
+The source commit is `d81235049384534c167caea52b85a694f6103d14`.
+The helper also pins release/asset identity, the stable pointer content
+hash, and every extracted binary/member; extra or changed files fail closed.
+No upstream source is copied into the repository. Archive bytes are not
+RAM/VRAM requirements; binary integrity does not attest an HTTP endpoint.
+
+The [CPU experiment](../tools/hosted/cellivane_seed_speculate.py) checks that
+this binary exposes `none` and `draft-simple`, greedy draft controls and the
+required no-prompt-cache/reasoning flags. It uses the official 4B target and
+0.6B draft pins below. This is an external draft-model mechanism, distinct
+from Strata's model-native MTP and expert I/O prefetch. Current usage and
+failure/acceptance boundaries are in the
+[development guide](DEVELOPMENT_GUIDE.md#cpu-speculation-launcher-and-replay);
+[SPECULATION.md](SPECULATION.md) owns the paired metrics: all twelve text pairs
+matched, and draft acceptance was observed in the specified CPU/model run.
+A flag declaration or downloaded binary alone does not establish acceptance.
 
 [llamafile 0.10.6](https://github.com/mozilla-ai/llamafile/releases/tag/0.10.6)
 was the newer release observed during review; it does not replace the

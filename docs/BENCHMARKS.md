@@ -2,11 +2,18 @@
 
 Status: **PARTIAL / five accepted local runs**. All five final reports have
 `identity_schema_version=2`, `outcome="COMPLETED"` and `acceptance="PASS"`.
-Separate replay against the current sixteen runtime/launcher source files
+Separate replay against the matching sixteen runtime/launcher source files
 passed for all five reports and their bridge journals. Replay checks recorded
 integrity and semantic joins; it does not attest endpoint/PID identity.
 Earlier diagnostic runs without an acceptance field are preserved locally
 and excluded from public metrics.
+
+These measurements belong to the published
+[59c9bcd snapshot](https://github.com/tjwlstj/cellivane-seed/commit/59c9bcd).
+The current comparison launcher has changed its source enumeration to an
+explicit sixteen-file family; that change does not refresh these historical
+run hashes or validate new source. The separate draft/target experiment is
+documented in [SPECULATION.md](SPECULATION.md).
 
 ## Question and scope
 
