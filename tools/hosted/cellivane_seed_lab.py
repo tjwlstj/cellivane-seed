@@ -142,7 +142,8 @@ def main(argv=None):
                "token_mtp": False, "kv_sharing": False, "independent_tensor_kernels": False,
                "canonical_main_binding": False, "quality_improvement_claim": False,
                "source_sha256": {str(p.relative_to(REPO)).replace('\\', '/'): lab.digest(p)
-                   for p in sorted(list((REPO / "hosted" / "experimental" / "cellivane_seed").glob("*.py"))
+                   for p in sorted([REPO / "hosted" / "experimental" / "cellivane_seed" / name
+                       for name in ("__init__.py", "__main__.py", "core.py", "server.py")]
                        + list((REPO / "hosted" / "experimental" / "cellivane_bridge").glob("*.py"))
                        + [Path(__file__), Path(lab.__file__)])},
                "launcher_sha256": lab.digest(__file__), "cleanup": []}

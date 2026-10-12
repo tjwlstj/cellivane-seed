@@ -12,6 +12,10 @@ This standalone export originated in the AIOS/Cellivane experimental hosted
 tree. It is not the native kernel, a Strata fork, or an independent tensor
 inference implementation. Model weights and engine binaries are not bundled.
 
+Read the [architecture](docs/ARCHITECTURE.md),
+[upstream references and model hashes](docs/UPSTREAM.md), and
+[bounded model/placement comparison](docs/BENCHMARKS.md).
+
 ## What is implemented / 구현 범위
 
 - Loopback-only, nonstreaming OpenAI subset: `/health`, `/v1/models`,
@@ -22,11 +26,14 @@ inference implementation. Model weights and engine binaries are not bundled.
   stdlib verifiers for Seed smoke and reference/subengine bridge journals.
 - An owned Windows CPU lab using pinned llamafile and an isolated Ollama
   candidate. Process cleanup uses retained handles and Windows Job Objects.
+- An owned Windows Ollama comparison path with `cpu`, `hybrid`, and `auto`
+  placement plans, separate observed-layer evidence, and a fixed small corpus.
 
 No token MTP, training, cross-process KV sharing, tool calls, streaming, or
 automatic native Kernel Room binding is implemented. Cache/coalescing avoids
-duplicate requests; it is not speculative token decoding. General GPU and
-cross-hardware performance support needs separate measurements.
+duplicate requests; it is not speculative token decoding. CPU and one-GPU
+placement were observed in bounded local runs. General GPU qualification and
+cross-hardware performance support need separate measurements.
 
 ## Requirements and tests / 준비와 테스트
 
@@ -40,8 +47,17 @@ python -B -m unittest discover -s tools/hosted/tests -p "test_cellivane_*.py" -v
 On Windows, `py -3` may replace `python`; on Linux, use `python3` if needed.
 These tests use synthetic data, owned loopback HTTP servers and Python-only
 process fixtures. They do not download or execute a model. Windows Job and
-archive tests are skipped on other systems. CI is configured for Windows and
-Ubuntu with Python 3.11; a configured workflow is not a completed CI result.
+archive tests are skipped on other systems. The initial public beta source
+[5f19faf](https://github.com/tjwlstj/cellivane-seed/commit/5f19faf9479ff487be041d94695d4b78fe07816d)
+passed [Windows and Ubuntu CI](https://github.com/tjwlstj/cellivane-seed/actions/runs/38191543178):
+175 tests on each platform, with 15 platform skips on Ubuntu. That historical
+run does not validate the newer comparison/profile additions; their final CI
+must be checked at the corresponding published source revision.
+
+The expanded comparison/profile source passed the final local Windows suite:
+280 tests, zero skips, 28.110 seconds, including 45 comparison-verifier
+positive/negative fixtures. Actual model results and their separate replay
+are described in [BENCHMARKS.md](docs/BENCHMARKS.md).
 
 ## Attach a local backend / 기존 로컬 backend 연결
 
@@ -108,6 +124,46 @@ fixed disk. UNC/network and reparse-point storage are rejected by the Windows
 lab. The retained smoke verifier expects the default ports 18941, 18942 and
 18932; other profiles require their own validation.
 
+## Compare model size and placement / 모델 크기·배치 비교
+
+The separate comparison path uses pinned Ollama v0.40.2 and official dense
+Qwen3 Q8_0 files. The asset downloader only obtains/verifies GGUF bytes; it
+does not install an engine or run a model. Keep the existing verified engine
+cache (`--asset-root`), model directory (`--model-file`) and private output
+directory (`--storage-root`) distinct. Example local D: paths below can be
+changed to another supported local fixed disk:
+
+```powershell
+$modelRoot = 'D:/AIOS/cellivane-seed-models-20261012'
+$engineAssets = 'D:/AIOS/cellivane-bridge-20261009'
+py -3 -B tools/hosted/cellivane_seed_assets.py --model 1.7b --storage-root $modelRoot
+py -3 -B tools/hosted/cellivane_seed_assets.py --model 4b --storage-root $modelRoot
+py -3 -B tools/hosted/cellivane_seed_compare.py --model 1.7b --model-file "$modelRoot/models/Qwen3-1.7B-Q8_0.gguf" --asset-root $engineAssets --storage-root $modelRoot --profile cpu --repeat 2
+py -3 -B tools/hosted/cellivane_seed_compare.py --model 4b --model-file "$modelRoot/models/Qwen3-4B-Q8_0.gguf" --asset-root $engineAssets --storage-root $modelRoot --profile hybrid --layers 14 --repeat 2
+py -3 -B tools/hosted/cellivane_seed_compare.py --model 1.7b --model-file "$modelRoot/models/Qwen3-1.7B-Q8_0.gguf" --asset-root $engineAssets --storage-root $modelRoot --profile auto --repeat 2
+```
+
+The engine cache still needs the separately verified original 0.6B/llamafile
+assets described above; the comparison reuses the lab's complete engine-cache
+validation. `--model 0.6b` is also available in the downloader and comparison
+tool. CPU requests zero GPU layers; hybrid requests an explicit count; auto
+lets the backend choose. A requested profile is not proof of actual offload.
+The comparison executes models, starts owned processes and stores private
+raw evidence. Read `acceptance`, observed placement, source/model stability
+and cleanup results in the printed report.
+
+Five accepted local runs used twelve fixed exact-format cases twice, with
+temperature 0, maximum 64 tokens, context 2048 and no Seed result cache.
+CPU scores were 6/24 for 0.6B, 14/24 for 1.7B and 22/24 for 4B. The same
+scores held for the tested 1.7B auto and 4B hybrid runs, which observed
+29/29 and 14/37 GPU layers respectively on one RTX 5050. All five exercised
+Seed-to-bridge compatibility and passed separate recorded-evidence replay.
+This small corpus is not a general accuracy benchmark, and backend-local
+prompt/KV reuse may affect timing. See [BENCHMARKS.md](docs/BENCHMARKS.md)
+and its [allowlisted aggregate JSON](docs/benchmarks/2026-10-12-summary.json)
+for timing scope, provenance, run hashes and limits. Raw prompts, answers,
+logs, local paths and process IDs are kept outside the public repository.
+
 ## Evidence and limits / 증거와 한계
 
 Use a summary path printed by the smoke:
@@ -115,6 +171,7 @@ Use a summary path printed by the smoke:
 ```sh
 python -B tools/hosted/verify_cellivane_seed.py /absolute/path/to/lab-summary.json
 python -B tools/hosted/verify_cellivane_bridge.py --run-directory /absolute/path/to/bridge/run
+python -B tools/hosted/verify_cellivane_comparison.py /absolute/path/to/comparison.json --source-root /absolute/path/to/matching-source
 ```
 
 The verifiers do not import runtime validators. They check recorded integrity
@@ -122,6 +179,12 @@ and semantic joins. Unkeyed hashes and cleanup receipts do not independently
 authenticate an engine, prove OS process liveness, or prove model quality.
 Changing sources creates a new evidence boundary; an earlier PASS does not
 validate later code.
+
+Comparison replay additionally checks the requested plan/configuration
+identity, raw backend joins, corpus scores/timings, observed placement and
+the separate bridge journal. Use the exact source tree matching the report.
+It validates recorded evidence rather than rerunning a model or proving
+which process owned an HTTP endpoint.
 
 Audit files and engine logs can contain prompts, responses and absolute local
 paths. Keep them private and outside Git. The included `.gitignore` excludes

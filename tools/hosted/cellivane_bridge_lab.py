@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Owned local CPU engine lab. Pinned assets and all mutable state live on D:.
+"""Owned local CPU engine lab. Pinned assets and mutable state use local storage.
 
 This launcher requires free ports before startup and installs no system service.
 The preflight does not authenticate a listener's PID across the bind race. The

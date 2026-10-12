@@ -1,0 +1,954 @@
+{
+  "schema_version": 1,
+  "project": "Cellivane Seed",
+  "date": "2026-10-12",
+  "scope": "one-machine-windows-dense-model-placement-smoke",
+  "status": "ACCEPTED_WITH_INDEPENDENT_REPLAY",
+  "hardware": {
+    "os": "Windows",
+    "cpu_threads_requested": 4,
+    "gpu": "NVIDIA GeForce RTX 5050",
+    "gpu_driver": "617.42",
+    "gpu_memory_total_mib_reported": 8151,
+    "gpu_visible_to_hybrid_auto": 1,
+    "cpu_model_recorded_in_raw_report": false
+  },
+  "protocol": {
+    "cases": 12,
+    "repeat": 2,
+    "trials_per_run": 24,
+    "temperature": 0,
+    "max_tokens": 64,
+    "num_ctx": 2048,
+    "num_thread": 4,
+    "slots": 1,
+    "stream": false,
+    "think": false,
+    "seed_result_cache": false,
+    "warmup_separate": true,
+    "backend_prompt_kv_reuse_may_occur": true,
+    "exact_score": "text.strip() == expected",
+    "wall_scope": "Seed HTTP plus local backend and serialized audit writes",
+    "tokens_per_second_scope": "backend eval_count / eval_duration",
+    "identity_schema_version": 2
+  },
+  "privacy": {
+    "raw_reports_published": false,
+    "raw_prompts_published": false,
+    "raw_answers_published": false,
+    "absolute_paths_published": false,
+    "process_ids_published": false,
+    "environment_dump_published": false
+  },
+  "limitations": {
+    "general_accuracy_benchmark": false,
+    "statistical_confidence_claim": false,
+    "quality_improvement_claim": false,
+    "multi_gpu_execution": false,
+    "native_mtp": false,
+    "native_kernel_binding": false,
+    "endpoint_pid_attestation": false,
+    "independent_tensor_engine_implementation": false
+  },
+  "runs": [
+    {
+      "run_id": "d51fd715-d606-4958-a99b-dc2816d962e2",
+      "raw_report_sha256": "14500368f73bdcbe5caafd288961cb85e530937865919e3ee7ab38b5433380c0",
+      "model": "0.6b",
+      "quantization": "Q8_0",
+      "model_bytes": 639446688,
+      "model_sha256": "9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031",
+      "requested_plan": {
+        "backend": "ollama",
+        "num_ctx": 2048,
+        "num_gpu": 0,
+        "num_thread": 4,
+        "profile": "cpu",
+        "schema_version": 1,
+        "scope": "requested-placement-only",
+        "slots": 1,
+        "temperature": 0
+      },
+      "identity_schema_version": 2,
+      "identity": "659025426e7c208bd4c6230ce1beafa052f227ae1a1e28766565cf3a6e886f27",
+      "execution_configuration_sha256": "ee54f1d2c4c7381a9a3423cc4bc1499f0179fa95354d3a326f940c11f8b99df2",
+      "source_sha256": {
+        "hosted/experimental/cellivane_bridge/__init__.py": "954129f056e94ac20a0511dcf8deff8b2c1b3f45f4bc81ea1b5e208bc272ab10",
+        "hosted/experimental/cellivane_bridge/__main__.py": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+        "hosted/experimental/cellivane_bridge/adapters.py": "b813cb2a875205dfb4278d4224fe7a416f8f391ee03b3b5726f8d8e5b0b21c46",
+        "hosted/experimental/cellivane_bridge/cli.py": "19dc4866abbaf091f8af720ce9bec1a5ca1f1527e0133454553b186bb60c361f",
+        "hosted/experimental/cellivane_bridge/contracts.py": "528bc419f960b0dcb2ba6ebc3e14ae02026173c97ed1035dfcd49db57217c5ff",
+        "hosted/experimental/cellivane_bridge/runtime.py": "8b366b6e146651f5fdefe1ac59da44109acea35c79176b107d61092828160695",
+        "hosted/experimental/cellivane_bridge/storage.py": "d4ece1ed296134be3df40c87372cb059c8b84e7b6a4391557652c159bd821d64",
+        "hosted/experimental/cellivane_seed/__init__.py": "ca0d15cbcac3fa9ad1043ae8dda1b97f2b2a3041d199b53be3a10b160473c08a",
+        "hosted/experimental/cellivane_seed/__main__.py": "540fd0a5992ca535482a9d44b2e268ce3a39bb47a0576f301214afa5ef4494b9",
+        "hosted/experimental/cellivane_seed/core.py": "208dbf714ae1fdcc31d1bc46bbadf11daa9c7c9b31f74af9a315c8cb36d38f4b",
+        "hosted/experimental/cellivane_seed/ollama.py": "cde8ea6a3b172cf175989b1849d8e9728774439919573a2667de590f1eef12d0",
+        "hosted/experimental/cellivane_seed/placement.py": "4fc8d0bc8a17287b19fef27eb5bd34a041949a6375a9e9d9752bbafab84fc38d",
+        "hosted/experimental/cellivane_seed/server.py": "776605556b34b1887521d1a993cf6e85a50e3986664c0e4d64ed95ecf27c47fb",
+        "tools/hosted/cellivane_bridge_lab.py": "46b5416ff5f80d14b25569dbd337ece96ba90cc02ffcfe3c6360d0f3d3af2991",
+        "tools/hosted/cellivane_seed_compare.py": "045e57f8d48fdda70ceb3e8b29d3dc1c0d65f1ce410f8323ae7595456290dbfe",
+        "tools/hosted/cellivane_seed_lab.py": "a1c2e7a45b69d7cf4c62ae988dd8e5e2c4b4f9a08a95deaee173ae4bc7c56fda"
+      },
+      "source_files_verified": 16,
+      "backend_archive_sha256": "e29ad1d5063dd4b54b2492d9b00adab2cff9621bfa654b6c92aa8d6f1fdfe7fc",
+      "backend_tree_sha256": "b1ef71e6be00c6930c227d3357871b27dd7a3151245179ab646768b35be20859",
+      "corpus_sha256": "04ad137c354298cddce8654be30a06ee4fad2e77d7d1478ce60d86d9e28bfc91",
+      "producer_acceptance": "PASS",
+      "producer_outcome": "COMPLETED",
+      "independent_verification": "PASS",
+      "metrics": {
+        "answered": 24,
+        "exact": 6,
+        "median_generation_tokens_s": 94.14920089672512,
+        "median_wall_s": 0.16140784999970492,
+        "timing_scope": "successful-computed-responses-only; no Seed result cache; backend prompt KV reuse may occur",
+        "total": 24
+      },
+      "case_scores": [
+        {
+          "case_id": "add",
+          "trials": 2,
+          "exact": 0
+        },
+        {
+          "case_id": "multiply",
+          "trials": 2,
+          "exact": 0
+        },
+        {
+          "case_id": "control",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "capital-ko",
+          "trials": 2,
+          "exact": 0
+        },
+        {
+          "case_id": "translate-ko",
+          "trials": 2,
+          "exact": 0
+        },
+        {
+          "case_id": "extract-ko",
+          "trials": 2,
+          "exact": 0
+        },
+        {
+          "case_id": "list-count",
+          "trials": 2,
+          "exact": 0
+        },
+        {
+          "case_id": "logic",
+          "trials": 2,
+          "exact": 0
+        },
+        {
+          "case_id": "json-read",
+          "trials": 2,
+          "exact": 0
+        },
+        {
+          "case_id": "python",
+          "trials": 2,
+          "exact": 0
+        },
+        {
+          "case_id": "binary",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "unknown-ko",
+          "trials": 2,
+          "exact": 2
+        }
+      ],
+      "warmup_wall_s": 1.7416444000009506,
+      "placement_observed": {
+        "status": "CPU_OBSERVED",
+        "offloaded_layers": null,
+        "total_layers": null,
+        "offload_count_source": "none",
+        "runtimes": [
+          "CPU"
+        ],
+        "gpu_offload_observed": false,
+        "gpu_qualified": false,
+        "multi_gpu_qualified": false,
+        "log_sha256": "51ca1e515ed079d06c4109deb6c890a5555b8cab4a16c4a32351320d866d3a86"
+      },
+      "loaded_model_size_vram_bytes": 0,
+      "loaded_model_digest": "d704d6d3aa43c17d4b6784b0cabcfb8510d9e8111031f92b63139e81a360c95a",
+      "bridge": {
+        "outcome": "COMPLETE",
+        "dispatch_count": 2,
+        "answered": 2,
+        "same_tensor_worker": true
+      },
+      "terminal_state": {
+        "active": 0,
+        "inflight": 0,
+        "waiters": 0,
+        "cache_hits": 0,
+        "coalesced": 0,
+        "failures": 0,
+        "timeouts": 0,
+        "computed": 26,
+        "backend_calls": 26,
+        "closed": true,
+        "poisoned": false
+      },
+      "cleanup": {
+        "owned_processes": 2,
+        "all_jobs_cleanup_confirmed": true,
+        "all_ports_closed": true
+      },
+      "source_unchanged_during_run": true,
+      "model_unchanged_during_run": true,
+      "independent_audit_records_verified": 81,
+      "independent_bridge_replay": "PASS",
+      "independent_replay_scope": {
+        "scope": "comparison-record-integrity-and-semantic-replay",
+        "source_files_checked": true,
+        "artifact_identity_scope": "model-backend-plan-hash-label-only",
+        "actual_backend_qualification": false,
+        "endpoint_pid_attestation": false,
+        "process_liveness_verified": false,
+        "quality_generalization_verified": false,
+        "quality_improvement_verified": false,
+        "native_mtp": false,
+        "multi_gpu_qualified": false
+      }
+    },
+    {
+      "run_id": "30bc48b4-8dc4-4c37-a102-091a0e803423",
+      "raw_report_sha256": "9e5243cb45c558cb110817b6ece70b78358dd450e781850f3b8fcab8f10a9002",
+      "model": "1.7b",
+      "quantization": "Q8_0",
+      "model_bytes": 1834426016,
+      "model_sha256": "061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a",
+      "requested_plan": {
+        "backend": "ollama",
+        "num_ctx": 2048,
+        "num_gpu": 0,
+        "num_thread": 4,
+        "profile": "cpu",
+        "schema_version": 1,
+        "scope": "requested-placement-only",
+        "slots": 1,
+        "temperature": 0
+      },
+      "identity_schema_version": 2,
+      "identity": "54d83c21b9613af53d1eae5f9bbe69021eb0e2a061d7f8790bbff638e3dfba7e",
+      "execution_configuration_sha256": "501a8d441d816ab1fa97807ea26b3dedd6a6fb6ca5ecc15b7054f061b2ab4162",
+      "source_sha256": {
+        "hosted/experimental/cellivane_bridge/__init__.py": "954129f056e94ac20a0511dcf8deff8b2c1b3f45f4bc81ea1b5e208bc272ab10",
+        "hosted/experimental/cellivane_bridge/__main__.py": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+        "hosted/experimental/cellivane_bridge/adapters.py": "b813cb2a875205dfb4278d4224fe7a416f8f391ee03b3b5726f8d8e5b0b21c46",
+        "hosted/experimental/cellivane_bridge/cli.py": "19dc4866abbaf091f8af720ce9bec1a5ca1f1527e0133454553b186bb60c361f",
+        "hosted/experimental/cellivane_bridge/contracts.py": "528bc419f960b0dcb2ba6ebc3e14ae02026173c97ed1035dfcd49db57217c5ff",
+        "hosted/experimental/cellivane_bridge/runtime.py": "8b366b6e146651f5fdefe1ac59da44109acea35c79176b107d61092828160695",
+        "hosted/experimental/cellivane_bridge/storage.py": "d4ece1ed296134be3df40c87372cb059c8b84e7b6a4391557652c159bd821d64",
+        "hosted/experimental/cellivane_seed/__init__.py": "ca0d15cbcac3fa9ad1043ae8dda1b97f2b2a3041d199b53be3a10b160473c08a",
+        "hosted/experimental/cellivane_seed/__main__.py": "540fd0a5992ca535482a9d44b2e268ce3a39bb47a0576f301214afa5ef4494b9",
+        "hosted/experimental/cellivane_seed/core.py": "208dbf714ae1fdcc31d1bc46bbadf11daa9c7c9b31f74af9a315c8cb36d38f4b",
+        "hosted/experimental/cellivane_seed/ollama.py": "cde8ea6a3b172cf175989b1849d8e9728774439919573a2667de590f1eef12d0",
+        "hosted/experimental/cellivane_seed/placement.py": "4fc8d0bc8a17287b19fef27eb5bd34a041949a6375a9e9d9752bbafab84fc38d",
+        "hosted/experimental/cellivane_seed/server.py": "776605556b34b1887521d1a993cf6e85a50e3986664c0e4d64ed95ecf27c47fb",
+        "tools/hosted/cellivane_bridge_lab.py": "46b5416ff5f80d14b25569dbd337ece96ba90cc02ffcfe3c6360d0f3d3af2991",
+        "tools/hosted/cellivane_seed_compare.py": "045e57f8d48fdda70ceb3e8b29d3dc1c0d65f1ce410f8323ae7595456290dbfe",
+        "tools/hosted/cellivane_seed_lab.py": "a1c2e7a45b69d7cf4c62ae988dd8e5e2c4b4f9a08a95deaee173ae4bc7c56fda"
+      },
+      "source_files_verified": 16,
+      "backend_archive_sha256": "e29ad1d5063dd4b54b2492d9b00adab2cff9621bfa654b6c92aa8d6f1fdfe7fc",
+      "backend_tree_sha256": "b1ef71e6be00c6930c227d3357871b27dd7a3151245179ab646768b35be20859",
+      "corpus_sha256": "04ad137c354298cddce8654be30a06ee4fad2e77d7d1478ce60d86d9e28bfc91",
+      "producer_acceptance": "PASS",
+      "producer_outcome": "COMPLETED",
+      "independent_verification": "PASS",
+      "metrics": {
+        "answered": 24,
+        "exact": 14,
+        "median_generation_tokens_s": 39.037241990092326,
+        "median_wall_s": 0.323686650000127,
+        "timing_scope": "successful-computed-responses-only; no Seed result cache; backend prompt KV reuse may occur",
+        "total": 24
+      },
+      "case_scores": [
+        {
+          "case_id": "add",
+          "trials": 2,
+          "exact": 0
+        },
+        {
+          "case_id": "multiply",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "control",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "capital-ko",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "translate-ko",
+          "trials": 2,
+          "exact": 0
+        },
+        {
+          "case_id": "extract-ko",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "list-count",
+          "trials": 2,
+          "exact": 0
+        },
+        {
+          "case_id": "logic",
+          "trials": 2,
+          "exact": 0
+        },
+        {
+          "case_id": "json-read",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "python",
+          "trials": 2,
+          "exact": 0
+        },
+        {
+          "case_id": "binary",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "unknown-ko",
+          "trials": 2,
+          "exact": 2
+        }
+      ],
+      "warmup_wall_s": 3.946750200000679,
+      "placement_observed": {
+        "status": "CPU_OBSERVED",
+        "offloaded_layers": null,
+        "total_layers": null,
+        "offload_count_source": "none",
+        "runtimes": [
+          "CPU"
+        ],
+        "gpu_offload_observed": false,
+        "gpu_qualified": false,
+        "multi_gpu_qualified": false,
+        "log_sha256": "94c4438d0b4a9e18d0b8bdc0cc592f66d2ceeee734c29526258d490099fc778e"
+      },
+      "loaded_model_size_vram_bytes": 0,
+      "loaded_model_digest": "297358f55cd7356168f18fa01a07863725497ff2a26c2eac00a87f0ddae02b8f",
+      "bridge": {
+        "outcome": "COMPLETE",
+        "dispatch_count": 2,
+        "answered": 2,
+        "same_tensor_worker": true
+      },
+      "terminal_state": {
+        "active": 0,
+        "inflight": 0,
+        "waiters": 0,
+        "cache_hits": 0,
+        "coalesced": 0,
+        "failures": 0,
+        "timeouts": 0,
+        "computed": 26,
+        "backend_calls": 26,
+        "closed": true,
+        "poisoned": false
+      },
+      "cleanup": {
+        "owned_processes": 2,
+        "all_jobs_cleanup_confirmed": true,
+        "all_ports_closed": true
+      },
+      "source_unchanged_during_run": true,
+      "model_unchanged_during_run": true,
+      "independent_audit_records_verified": 81,
+      "independent_bridge_replay": "PASS",
+      "independent_replay_scope": {
+        "scope": "comparison-record-integrity-and-semantic-replay",
+        "source_files_checked": true,
+        "artifact_identity_scope": "model-backend-plan-hash-label-only",
+        "actual_backend_qualification": false,
+        "endpoint_pid_attestation": false,
+        "process_liveness_verified": false,
+        "quality_generalization_verified": false,
+        "quality_improvement_verified": false,
+        "native_mtp": false,
+        "multi_gpu_qualified": false
+      }
+    },
+    {
+      "run_id": "ba4960f1-250c-4b1d-a8de-8e8fad05a882",
+      "raw_report_sha256": "f6065a6a83ae9d2d1d5c0cdadfd44e9bd2d45eb745ce4f95cec83c059dd220e8",
+      "model": "4b",
+      "quantization": "Q8_0",
+      "model_bytes": 4280404704,
+      "model_sha256": "8c2f07f26af9747e41988551106f149b03eb9b5cb6df636027b6bf6278473300",
+      "requested_plan": {
+        "backend": "ollama",
+        "num_ctx": 2048,
+        "num_gpu": 0,
+        "num_thread": 4,
+        "profile": "cpu",
+        "schema_version": 1,
+        "scope": "requested-placement-only",
+        "slots": 1,
+        "temperature": 0
+      },
+      "identity_schema_version": 2,
+      "identity": "5f115c78cbadec593b39c673a8bbcfd569c9ad76b34684165ff66be06fae50a8",
+      "execution_configuration_sha256": "f2b6cab8ed2d050c4e2a5ebb81ec4a8f233a25f0aeda25a3c231751fbd8fae0f",
+      "source_sha256": {
+        "hosted/experimental/cellivane_bridge/__init__.py": "954129f056e94ac20a0511dcf8deff8b2c1b3f45f4bc81ea1b5e208bc272ab10",
+        "hosted/experimental/cellivane_bridge/__main__.py": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+        "hosted/experimental/cellivane_bridge/adapters.py": "b813cb2a875205dfb4278d4224fe7a416f8f391ee03b3b5726f8d8e5b0b21c46",
+        "hosted/experimental/cellivane_bridge/cli.py": "19dc4866abbaf091f8af720ce9bec1a5ca1f1527e0133454553b186bb60c361f",
+        "hosted/experimental/cellivane_bridge/contracts.py": "528bc419f960b0dcb2ba6ebc3e14ae02026173c97ed1035dfcd49db57217c5ff",
+        "hosted/experimental/cellivane_bridge/runtime.py": "8b366b6e146651f5fdefe1ac59da44109acea35c79176b107d61092828160695",
+        "hosted/experimental/cellivane_bridge/storage.py": "d4ece1ed296134be3df40c87372cb059c8b84e7b6a4391557652c159bd821d64",
+        "hosted/experimental/cellivane_seed/__init__.py": "ca0d15cbcac3fa9ad1043ae8dda1b97f2b2a3041d199b53be3a10b160473c08a",
+        "hosted/experimental/cellivane_seed/__main__.py": "540fd0a5992ca535482a9d44b2e268ce3a39bb47a0576f301214afa5ef4494b9",
+        "hosted/experimental/cellivane_seed/core.py": "208dbf714ae1fdcc31d1bc46bbadf11daa9c7c9b31f74af9a315c8cb36d38f4b",
+        "hosted/experimental/cellivane_seed/ollama.py": "cde8ea6a3b172cf175989b1849d8e9728774439919573a2667de590f1eef12d0",
+        "hosted/experimental/cellivane_seed/placement.py": "4fc8d0bc8a17287b19fef27eb5bd34a041949a6375a9e9d9752bbafab84fc38d",
+        "hosted/experimental/cellivane_seed/server.py": "776605556b34b1887521d1a993cf6e85a50e3986664c0e4d64ed95ecf27c47fb",
+        "tools/hosted/cellivane_bridge_lab.py": "46b5416ff5f80d14b25569dbd337ece96ba90cc02ffcfe3c6360d0f3d3af2991",
+        "tools/hosted/cellivane_seed_compare.py": "045e57f8d48fdda70ceb3e8b29d3dc1c0d65f1ce410f8323ae7595456290dbfe",
+        "tools/hosted/cellivane_seed_lab.py": "a1c2e7a45b69d7cf4c62ae988dd8e5e2c4b4f9a08a95deaee173ae4bc7c56fda"
+      },
+      "source_files_verified": 16,
+      "backend_archive_sha256": "e29ad1d5063dd4b54b2492d9b00adab2cff9621bfa654b6c92aa8d6f1fdfe7fc",
+      "backend_tree_sha256": "b1ef71e6be00c6930c227d3357871b27dd7a3151245179ab646768b35be20859",
+      "corpus_sha256": "04ad137c354298cddce8654be30a06ee4fad2e77d7d1478ce60d86d9e28bfc91",
+      "producer_acceptance": "PASS",
+      "producer_outcome": "COMPLETED",
+      "independent_verification": "PASS",
+      "metrics": {
+        "answered": 24,
+        "exact": 22,
+        "median_generation_tokens_s": 16.69877536346457,
+        "median_wall_s": 0.7108385999990787,
+        "timing_scope": "successful-computed-responses-only; no Seed result cache; backend prompt KV reuse may occur",
+        "total": 24
+      },
+      "case_scores": [
+        {
+          "case_id": "add",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "multiply",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "control",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "capital-ko",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "translate-ko",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "extract-ko",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "list-count",
+          "trials": 2,
+          "exact": 0
+        },
+        {
+          "case_id": "logic",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "json-read",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "python",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "binary",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "unknown-ko",
+          "trials": 2,
+          "exact": 2
+        }
+      ],
+      "warmup_wall_s": 7.834940599999754,
+      "placement_observed": {
+        "status": "CPU_OBSERVED",
+        "offloaded_layers": null,
+        "total_layers": null,
+        "offload_count_source": "none",
+        "runtimes": [
+          "CPU"
+        ],
+        "gpu_offload_observed": false,
+        "gpu_qualified": false,
+        "multi_gpu_qualified": false,
+        "log_sha256": "951a571a38da4ee9a04dd3462a96b960320c38ababe3ac9031ba5f1244007f01"
+      },
+      "loaded_model_size_vram_bytes": 0,
+      "loaded_model_digest": "94d79cf6dfb2eaaf94b77628889dc0085368609b755d1b598b3048068d5aaa2c",
+      "bridge": {
+        "outcome": "COMPLETE",
+        "dispatch_count": 2,
+        "answered": 2,
+        "same_tensor_worker": true
+      },
+      "terminal_state": {
+        "active": 0,
+        "inflight": 0,
+        "waiters": 0,
+        "cache_hits": 0,
+        "coalesced": 0,
+        "failures": 0,
+        "timeouts": 0,
+        "computed": 26,
+        "backend_calls": 26,
+        "closed": true,
+        "poisoned": false
+      },
+      "cleanup": {
+        "owned_processes": 2,
+        "all_jobs_cleanup_confirmed": true,
+        "all_ports_closed": true
+      },
+      "source_unchanged_during_run": true,
+      "model_unchanged_during_run": true,
+      "independent_audit_records_verified": 81,
+      "independent_bridge_replay": "PASS",
+      "independent_replay_scope": {
+        "scope": "comparison-record-integrity-and-semantic-replay",
+        "source_files_checked": true,
+        "artifact_identity_scope": "model-backend-plan-hash-label-only",
+        "actual_backend_qualification": false,
+        "endpoint_pid_attestation": false,
+        "process_liveness_verified": false,
+        "quality_generalization_verified": false,
+        "quality_improvement_verified": false,
+        "native_mtp": false,
+        "multi_gpu_qualified": false
+      }
+    },
+    {
+      "run_id": "36797f5a-dc89-42cc-9393-d7554cb7b6ff",
+      "raw_report_sha256": "607cfc31bebd98d7a9e870cd8a535b8f4d57ca69c937a4b0a8b673274d87acde",
+      "model": "4b",
+      "quantization": "Q8_0",
+      "model_bytes": 4280404704,
+      "model_sha256": "8c2f07f26af9747e41988551106f149b03eb9b5cb6df636027b6bf6278473300",
+      "requested_plan": {
+        "backend": "ollama",
+        "num_ctx": 2048,
+        "num_gpu": 14,
+        "num_thread": 4,
+        "profile": "hybrid",
+        "schema_version": 1,
+        "scope": "requested-placement-only",
+        "slots": 1,
+        "temperature": 0
+      },
+      "identity_schema_version": 2,
+      "identity": "6c45aa7f57cf39bd657e687cdb61bc24510344fc6673d7595840a8bd0de18516",
+      "execution_configuration_sha256": "965ead5a499000dd07f739e4c5922d98b58dc7536d78cce6313fb80122d5e4ce",
+      "source_sha256": {
+        "hosted/experimental/cellivane_bridge/__init__.py": "954129f056e94ac20a0511dcf8deff8b2c1b3f45f4bc81ea1b5e208bc272ab10",
+        "hosted/experimental/cellivane_bridge/__main__.py": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+        "hosted/experimental/cellivane_bridge/adapters.py": "b813cb2a875205dfb4278d4224fe7a416f8f391ee03b3b5726f8d8e5b0b21c46",
+        "hosted/experimental/cellivane_bridge/cli.py": "19dc4866abbaf091f8af720ce9bec1a5ca1f1527e0133454553b186bb60c361f",
+        "hosted/experimental/cellivane_bridge/contracts.py": "528bc419f960b0dcb2ba6ebc3e14ae02026173c97ed1035dfcd49db57217c5ff",
+        "hosted/experimental/cellivane_bridge/runtime.py": "8b366b6e146651f5fdefe1ac59da44109acea35c79176b107d61092828160695",
+        "hosted/experimental/cellivane_bridge/storage.py": "d4ece1ed296134be3df40c87372cb059c8b84e7b6a4391557652c159bd821d64",
+        "hosted/experimental/cellivane_seed/__init__.py": "ca0d15cbcac3fa9ad1043ae8dda1b97f2b2a3041d199b53be3a10b160473c08a",
+        "hosted/experimental/cellivane_seed/__main__.py": "540fd0a5992ca535482a9d44b2e268ce3a39bb47a0576f301214afa5ef4494b9",
+        "hosted/experimental/cellivane_seed/core.py": "208dbf714ae1fdcc31d1bc46bbadf11daa9c7c9b31f74af9a315c8cb36d38f4b",
+        "hosted/experimental/cellivane_seed/ollama.py": "cde8ea6a3b172cf175989b1849d8e9728774439919573a2667de590f1eef12d0",
+        "hosted/experimental/cellivane_seed/placement.py": "4fc8d0bc8a17287b19fef27eb5bd34a041949a6375a9e9d9752bbafab84fc38d",
+        "hosted/experimental/cellivane_seed/server.py": "776605556b34b1887521d1a993cf6e85a50e3986664c0e4d64ed95ecf27c47fb",
+        "tools/hosted/cellivane_bridge_lab.py": "46b5416ff5f80d14b25569dbd337ece96ba90cc02ffcfe3c6360d0f3d3af2991",
+        "tools/hosted/cellivane_seed_compare.py": "045e57f8d48fdda70ceb3e8b29d3dc1c0d65f1ce410f8323ae7595456290dbfe",
+        "tools/hosted/cellivane_seed_lab.py": "a1c2e7a45b69d7cf4c62ae988dd8e5e2c4b4f9a08a95deaee173ae4bc7c56fda"
+      },
+      "source_files_verified": 16,
+      "backend_archive_sha256": "e29ad1d5063dd4b54b2492d9b00adab2cff9621bfa654b6c92aa8d6f1fdfe7fc",
+      "backend_tree_sha256": "b1ef71e6be00c6930c227d3357871b27dd7a3151245179ab646768b35be20859",
+      "corpus_sha256": "04ad137c354298cddce8654be30a06ee4fad2e77d7d1478ce60d86d9e28bfc91",
+      "producer_acceptance": "PASS",
+      "producer_outcome": "COMPLETED",
+      "independent_verification": "PASS",
+      "metrics": {
+        "answered": 24,
+        "exact": 22,
+        "median_generation_tokens_s": 21.45707429198559,
+        "median_wall_s": 0.5259711500002595,
+        "timing_scope": "successful-computed-responses-only; no Seed result cache; backend prompt KV reuse may occur",
+        "total": 24
+      },
+      "case_scores": [
+        {
+          "case_id": "add",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "multiply",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "control",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "capital-ko",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "translate-ko",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "extract-ko",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "list-count",
+          "trials": 2,
+          "exact": 0
+        },
+        {
+          "case_id": "logic",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "json-read",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "python",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "binary",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "unknown-ko",
+          "trials": 2,
+          "exact": 2
+        }
+      ],
+      "warmup_wall_s": 5.280955499998527,
+      "placement_observed": {
+        "status": "GPU_OFFLOAD_OBSERVED",
+        "offloaded_layers": 14,
+        "total_layers": 37,
+        "offload_count_source": "native",
+        "runtimes": [
+          "CPU",
+          "CUDA"
+        ],
+        "gpu_offload_observed": true,
+        "gpu_qualified": false,
+        "multi_gpu_qualified": false,
+        "log_sha256": "94213f9f06fadf6b3178831b2e838b3b50306c0a4aabbbe0c48d8b20cde5aefc"
+      },
+      "loaded_model_size_vram_bytes": 2024496168,
+      "loaded_model_digest": "280b5f1e833fc3201e2c21ed42d8e60f30adb8a8e19e639c1c769cf7ebb78cac",
+      "bridge": {
+        "outcome": "COMPLETE",
+        "dispatch_count": 2,
+        "answered": 2,
+        "same_tensor_worker": true
+      },
+      "terminal_state": {
+        "active": 0,
+        "inflight": 0,
+        "waiters": 0,
+        "cache_hits": 0,
+        "coalesced": 0,
+        "failures": 0,
+        "timeouts": 0,
+        "computed": 26,
+        "backend_calls": 26,
+        "closed": true,
+        "poisoned": false
+      },
+      "cleanup": {
+        "owned_processes": 2,
+        "all_jobs_cleanup_confirmed": true,
+        "all_ports_closed": true
+      },
+      "source_unchanged_during_run": true,
+      "model_unchanged_during_run": true,
+      "independent_audit_records_verified": 81,
+      "independent_bridge_replay": "PASS",
+      "independent_replay_scope": {
+        "scope": "comparison-record-integrity-and-semantic-replay",
+        "source_files_checked": true,
+        "artifact_identity_scope": "model-backend-plan-hash-label-only",
+        "actual_backend_qualification": false,
+        "endpoint_pid_attestation": false,
+        "process_liveness_verified": false,
+        "quality_generalization_verified": false,
+        "quality_improvement_verified": false,
+        "native_mtp": false,
+        "multi_gpu_qualified": false
+      }
+    },
+    {
+      "run_id": "df7ec805-092d-4b27-af57-d78354e3f900",
+      "raw_report_sha256": "250ad368a869cde8365caf3aadb58e6ca4f9936546685054d3f1956da942b7aa",
+      "model": "1.7b",
+      "quantization": "Q8_0",
+      "model_bytes": 1834426016,
+      "model_sha256": "061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a",
+      "requested_plan": {
+        "backend": "ollama",
+        "num_ctx": 2048,
+        "num_gpu": -1,
+        "num_thread": 4,
+        "profile": "auto",
+        "schema_version": 1,
+        "scope": "requested-placement-only",
+        "slots": 1,
+        "temperature": 0
+      },
+      "identity_schema_version": 2,
+      "identity": "fb0aa5ae51add3721d9dc7612fdd379ade9da0d22278ff7449eab627acfc5783",
+      "execution_configuration_sha256": "686403ef23b7f84ffe8a97d0a20c3aef8080d94759cd47ea1be28d7c65103c67",
+      "source_sha256": {
+        "hosted/experimental/cellivane_bridge/__init__.py": "954129f056e94ac20a0511dcf8deff8b2c1b3f45f4bc81ea1b5e208bc272ab10",
+        "hosted/experimental/cellivane_bridge/__main__.py": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+        "hosted/experimental/cellivane_bridge/adapters.py": "b813cb2a875205dfb4278d4224fe7a416f8f391ee03b3b5726f8d8e5b0b21c46",
+        "hosted/experimental/cellivane_bridge/cli.py": "19dc4866abbaf091f8af720ce9bec1a5ca1f1527e0133454553b186bb60c361f",
+        "hosted/experimental/cellivane_bridge/contracts.py": "528bc419f960b0dcb2ba6ebc3e14ae02026173c97ed1035dfcd49db57217c5ff",
+        "hosted/experimental/cellivane_bridge/runtime.py": "8b366b6e146651f5fdefe1ac59da44109acea35c79176b107d61092828160695",
+        "hosted/experimental/cellivane_bridge/storage.py": "d4ece1ed296134be3df40c87372cb059c8b84e7b6a4391557652c159bd821d64",
+        "hosted/experimental/cellivane_seed/__init__.py": "ca0d15cbcac3fa9ad1043ae8dda1b97f2b2a3041d199b53be3a10b160473c08a",
+        "hosted/experimental/cellivane_seed/__main__.py": "540fd0a5992ca535482a9d44b2e268ce3a39bb47a0576f301214afa5ef4494b9",
+        "hosted/experimental/cellivane_seed/core.py": "208dbf714ae1fdcc31d1bc46bbadf11daa9c7c9b31f74af9a315c8cb36d38f4b",
+        "hosted/experimental/cellivane_seed/ollama.py": "cde8ea6a3b172cf175989b1849d8e9728774439919573a2667de590f1eef12d0",
+        "hosted/experimental/cellivane_seed/placement.py": "4fc8d0bc8a17287b19fef27eb5bd34a041949a6375a9e9d9752bbafab84fc38d",
+        "hosted/experimental/cellivane_seed/server.py": "776605556b34b1887521d1a993cf6e85a50e3986664c0e4d64ed95ecf27c47fb",
+        "tools/hosted/cellivane_bridge_lab.py": "46b5416ff5f80d14b25569dbd337ece96ba90cc02ffcfe3c6360d0f3d3af2991",
+        "tools/hosted/cellivane_seed_compare.py": "045e57f8d48fdda70ceb3e8b29d3dc1c0d65f1ce410f8323ae7595456290dbfe",
+        "tools/hosted/cellivane_seed_lab.py": "a1c2e7a45b69d7cf4c62ae988dd8e5e2c4b4f9a08a95deaee173ae4bc7c56fda"
+      },
+      "source_files_verified": 16,
+      "backend_archive_sha256": "e29ad1d5063dd4b54b2492d9b00adab2cff9621bfa654b6c92aa8d6f1fdfe7fc",
+      "backend_tree_sha256": "b1ef71e6be00c6930c227d3357871b27dd7a3151245179ab646768b35be20859",
+      "corpus_sha256": "04ad137c354298cddce8654be30a06ee4fad2e77d7d1478ce60d86d9e28bfc91",
+      "producer_acceptance": "PASS",
+      "producer_outcome": "COMPLETED",
+      "independent_verification": "PASS",
+      "metrics": {
+        "answered": 24,
+        "exact": 14,
+        "median_generation_tokens_s": 150.9040088834866,
+        "median_wall_s": 0.08244664999983797,
+        "timing_scope": "successful-computed-responses-only; no Seed result cache; backend prompt KV reuse may occur",
+        "total": 24
+      },
+      "case_scores": [
+        {
+          "case_id": "add",
+          "trials": 2,
+          "exact": 0
+        },
+        {
+          "case_id": "multiply",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "control",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "capital-ko",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "translate-ko",
+          "trials": 2,
+          "exact": 0
+        },
+        {
+          "case_id": "extract-ko",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "list-count",
+          "trials": 2,
+          "exact": 0
+        },
+        {
+          "case_id": "logic",
+          "trials": 2,
+          "exact": 0
+        },
+        {
+          "case_id": "json-read",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "python",
+          "trials": 2,
+          "exact": 0
+        },
+        {
+          "case_id": "binary",
+          "trials": 2,
+          "exact": 2
+        },
+        {
+          "case_id": "unknown-ko",
+          "trials": 2,
+          "exact": 2
+        }
+      ],
+      "warmup_wall_s": 14.33120240000062,
+      "placement_observed": {
+        "status": "GPU_OFFLOAD_OBSERVED",
+        "offloaded_layers": 29,
+        "total_layers": 29,
+        "offload_count_source": "native",
+        "runtimes": [
+          "CPU",
+          "CUDA"
+        ],
+        "gpu_offload_observed": true,
+        "gpu_qualified": false,
+        "multi_gpu_qualified": false,
+        "log_sha256": "609e4b31450179df107ee658f9f5fb6885d99b09d18db2b2444b06beb77430d0"
+      },
+      "loaded_model_size_vram_bytes": 2115795680,
+      "loaded_model_digest": "5b7180ffb441343c72761e0fa239fcae6df01cbc9803f54c7fa2c0050cc95bdc",
+      "bridge": {
+        "outcome": "COMPLETE",
+        "dispatch_count": 2,
+        "answered": 2,
+        "same_tensor_worker": true
+      },
+      "terminal_state": {
+        "active": 0,
+        "inflight": 0,
+        "waiters": 0,
+        "cache_hits": 0,
+        "coalesced": 0,
+        "failures": 0,
+        "timeouts": 0,
+        "computed": 26,
+        "backend_calls": 26,
+        "closed": true,
+        "poisoned": false
+      },
+      "cleanup": {
+        "owned_processes": 2,
+        "all_jobs_cleanup_confirmed": true,
+        "all_ports_closed": true
+      },
+      "source_unchanged_during_run": true,
+      "model_unchanged_during_run": true,
+      "independent_audit_records_verified": 81,
+      "independent_bridge_replay": "PASS",
+      "independent_replay_scope": {
+        "scope": "comparison-record-integrity-and-semantic-replay",
+        "source_files_checked": true,
+        "artifact_identity_scope": "model-backend-plan-hash-label-only",
+        "actual_backend_qualification": false,
+        "endpoint_pid_attestation": false,
+        "process_liveness_verified": false,
+        "quality_generalization_verified": false,
+        "quality_improvement_verified": false,
+        "native_mtp": false,
+        "multi_gpu_qualified": false
+      },
+      "placement_interpretation": "29/29 model layers offloaded to CUDA; CPU runtime availability does not imply model-layer CPU execution"
+    }
+  ],
+  "independent_replay_scope": {
+    "recorded_integrity_and_semantic_joins": true,
+    "current_runtime_source_files": 16,
+    "audit_records_per_run": 81,
+    "bridge_journals": "PASS",
+    "endpoint_pid_attestation": false,
+    "verifier_regressions": {
+      "tests": 45,
+      "outcome": "PASS",
+      "fixtures": "positive-and-negative"
+    },
+    "verifier_source_sha256": "6e33b097af3624c4f0305805a81bba23cf2b8c16b33462bf5253f1b0965425b4",
+    "private_verdict_bundle_sha256": "1658f49c5c948100380adcfab61e9e19e6c8d15f94fe9627c7900d8c6f2094e4"
+  },
+  "local_unit_regression": {
+    "platform": "Windows",
+    "tests": 280,
+    "passed": 280,
+    "skipped": 0,
+    "elapsed_s": 28.11,
+    "outcome": "PASS",
+    "scope": "expanded-source-unit-and-loopback-fixture-suite; separate from actual model runs"
+  },
+  "host_observation": {
+    "source": "separate current Windows CIM Win32_Processor host inspection; provided by project operator",
+    "observation_date": "2026-10-12",
+    "scope": "host inventory, not recovered from raw comparison reports",
+    "cpu_model": "AMD Ryzen 7 7840HS w/ Radeon 780M Graphics",
+    "physical_cores": 8,
+    "logical_processors": 16
+  }
+}

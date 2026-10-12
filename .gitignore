@@ -17,6 +17,7 @@ htmlcov/
 /runs/
 /seed-runs/
 /lab-runs/
+/compare-runs/
 /owned-profile/
 /ollama-models/
 /build/
