@@ -1,0 +1,52 @@
+# Python development files
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local assets and generated evidence; source/config JSON is intentionally kept.
+/assets/
+/data/
+/models/
+/engines/
+/downloads/
+/evidence/
+/runs/
+/seed-runs/
+/lab-runs/
+/owned-profile/
+/ollama-models/
+/build/
+/dist/
+*.gguf
+*.safetensors
+*.pt
+*.pth
+*.onnx
+*.exe
+*.dll
+*.zip
+*.log
+*.tmp
+*.part
+
+# Local secrets are never distribution inputs.
+.env
+.env.*
+!.env.example
+.credentials/
+credentials.json
+secrets.json
+*.pem
+*.key
+*.pfx
+*.p12
+
+# Editor and OS metadata
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
