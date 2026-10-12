@@ -12,6 +12,7 @@ from pathlib import Path
 import sys
 import tempfile
 import threading
+from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 import zipfile
@@ -468,7 +469,10 @@ class PhaseIntegrityTests(unittest.TestCase):
             failed = good_summary()["phases"][0]
             failed["outcome"] = "FAIL"
             failed["backend_assets_unchanged_during_run"] = False
-            with patch.object(spec, "source_hashes", return_value={}), \
+            # This synthetic control-flow fixture mocks all process execution;
+            # select the launcher branch without changing pathlib's host OS.
+            with patch.object(spec, "os", SimpleNamespace(name="nt")), \
+                    patch.object(spec, "source_hashes", return_value={}), \
                     patch.object(assets, "prepare_assets", return_value={}), \
                     patch.object(spec, "inspect_backend", return_value={}), \
                     patch.object(spec, "checked_model", return_value={}), \
