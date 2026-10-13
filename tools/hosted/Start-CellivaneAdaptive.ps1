@@ -4,6 +4,7 @@ param(
     [ValidateRange(1, 128)][int]$ExpectedOutputTokens = 128,
     [Parameter(Mandatory = $true)][string]$AssetRoot,
     [Parameter(Mandatory = $true)][string]$TargetFile,
+    [ValidateSet('0.6b', '1.7b', '4b')][string]$TargetProfile = '4b',
     [string]$DraftFile = '',
     [string]$CalibrationFile = '',
     [string]$CalibrationSourceRoot = '',
@@ -15,7 +16,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $taskArgs = @('-3', '-B', (Join-Path $PSScriptRoot 'cellivane_seed_adaptive.py'),
     '--mode', $Mode, '--policy', $Policy, '--expected-output-tokens', $ExpectedOutputTokens,
-    '--asset-root', $AssetRoot, '--target-file', $TargetFile,
+    '--asset-root', $AssetRoot, '--target-file', $TargetFile, '--target-profile', $TargetProfile,
     '--port', $Port, '--worker-port', $WorkerPort, '--serve-seconds', $ServeSeconds)
 if ($DraftFile) { $taskArgs += @('--draft-file', $DraftFile) }
 if ($CalibrationFile) { $taskArgs += @('--calibration-file', $CalibrationFile) }

@@ -46,7 +46,12 @@ Windows에서는 `py -3`, Linux에서는 필요하면 `python3`을 사용합니�
 이 역사적 결과는 이후 운영·선택 기능 변경을 검증하지 않습니다. 최신 소스는
 해당 revision의 실제 회귀 결과와 terminal CI를 따로 확인해야 합니다.
 
-현재 운영·adaptive 변경의 로컬 Windows 회귀는 **467 PASS / 0 skip / 42.739초**입니다.
+[e32e224 snapshot](https://github.com/tjwlstj/cellivane-seed/commit/e32e22419836add56b9fc70a6d91223ac90f59c8)의
+운영·adaptive 로컬 Windows 회귀는 **467 PASS / 0 skip / 42.739초**입니다.
+[해당 revision의 CI](https://github.com/tjwlstj/cellivane-seed/actions/runs/38333193360)도
+Windows·Ubuntu 모두 467개를 수집해 통과했고 Ubuntu는 15개를 건너뛰었습니다.
+이 이력은 아래 새 target-profile 변경을 검증하지 않습니다.
+새 profile 변경의 로컬 Windows 전체 회귀는 **505 PASS / 0 skip / 56.439초**입니다.
 새 공개 revision의 Ubuntu·Windows CI는
 [beta fixture workflow](https://github.com/tjwlstj/cellivane-seed/actions/workflows/tests.yml?query=branch%3Abeta)에서
 해당 commit과 terminal 결과를 확인하세요. 로컬 PASS를 새 CI 성공으로 표시하지 않습니다.
@@ -157,9 +162,9 @@ draft 444 offered / 366 accepted는 warmup을 포함합니다.
 
 ## CPU 시작 모드 선택과 서빙
 
-[Adaptive launcher](tools/hosted/cellivane_seed_adaptive.py)의 선택·기동 구현은
-**CURRENT**입니다. Auto baseline과 calibrated draft의 실제 기능 smoke와 독립
-기록 재판독이 **PASS**입니다. 제품은 고정된 실험 범위의 PARTIAL입니다. 첫 지원 profile은
+[Adaptive launcher](tools/hosted/cellivane_seed_adaptive.py)의 e32e224 선택·기동 구현과
+auto baseline/calibrated draft 기능 smoke의 독립 기록 재판독은 **PASS**였습니다.
+제품은 고정된 실험 범위의 PARTIAL입니다. 이 역사적 첫 지원 profile은
 공식 Qwen3-4B Q8_0 target과 선택적 Qwen3-0.6B Q8_0 draft만 사용합니다.
 Windows CPU, context 2048, thread 4, slot 1, cache 0, 최대 128 token으로 고정합니다.
 일반 GGUF·GPU profile이나 요청 중간 mode 변경을 지원한다는 뜻은 아닙니다.
@@ -190,6 +195,48 @@ dispatch 전 거부, audit 19개 및 소유 프로세스 cleanup을 기록합니
 이 결과는 시작 모드 선택·서빙 기능 검증이며 새 paired speed/quality 비교가 아닙니다.
 Python 명령이 기본 실행 경로입니다. 선택적 PowerShell wrapper는 AST 검사만 통과했고
 검사 host의 기존 실행 정책에서 `-File`이 차단됐습니다. 시스템 정책을 바꾸지 않습니다.
+
+## 명시적 target profile 확장
+
+**소스 구현 CURRENT / 고정 CPU profile 기능·독립 replay PASS / 제품 PARTIAL:** 새 adaptive CLI는
+`--target-profile 0.6b|1.7b|4b`를 제공합니다(기본 `4b`).
+각 profile은 공식 Qwen3 Q8_0의 정확한 byte/hash pin을 사용합니다. Model file과
+profile을 맞춰 지정하며, 자동 target 교체나 품질 하향 선택은 하지 않습니다.
+HTTP alias `cellivane-spec-target`은 고정 호환 이름이므로 실제 model 크기의 증거가 아닙니다.
+CPU/context/thread/slot/cache/128-token 한도는 위와 동일합니다.
+
+아래는 새 CLI의 실행 예시입니다. 4B를 먼저 다운로드하지 않아도 이 블록부터
+준비할 수 있습니다. 준비 명령은 모델 실행 없이 공식 파일을 다운로드·검증합니다.
+두 `serve` 명령 중 원하는 모델 하나를 선택하세요. 다른 모델로 바꾸려면 Ctrl+C로 종료한 뒤 실행합니다.
+
+```powershell
+$taskAssets = Join-Path $env:LOCALAPPDATA 'Cellivane/llama-assets'
+$taskModels = Join-Path $env:LOCALAPPDATA 'Cellivane/seed-models'
+py -3 -B tools/hosted/cellivane_llama_assets.py --asset-root $taskAssets --download-assets
+py -3 -B tools/hosted/cellivane_seed_assets.py --model 0.6b --storage-root $taskModels
+py -3 -B tools/hosted/cellivane_seed_assets.py --model 1.7b --storage-root $taskModels
+$taskTiny = Join-Path $taskModels 'models/Qwen3-0.6B-Q8_0.gguf'
+$taskSmall = Join-Path $taskModels 'models/Qwen3-1.7B-Q8_0.gguf'
+py -3 -B tools/hosted/cellivane_seed_adaptive.py --mode plan --target-profile 0.6b --policy auto --asset-root $taskAssets --target-file $taskTiny
+py -3 -B tools/hosted/cellivane_seed_adaptive.py --mode plan --target-profile 1.7b --policy auto --asset-root $taskAssets --target-file $taskSmall
+py -3 -B tools/hosted/cellivane_seed_adaptive.py --mode serve --target-profile 0.6b --policy auto --asset-root $taskAssets --target-file $taskTiny
+py -3 -B tools/hosted/cellivane_seed_adaptive.py --mode serve --target-profile 1.7b --policy auto --asset-root $taskAssets --target-file $taskSmall
+```
+
+0.6B target에는 draft를 허용하지 않습니다. 1.7B/4B target의 draft 후보는 pinned
+0.6B만이며 같거나 큰 draft는 거부합니다. 현재 calibration loader는 고정된 기존
+4B target/0.6B draft speculation 형식만 받으며, 1.7B matching calibration의 생성·입력은
+구현하지 않았습니다. 따라서 현재 1.7B `auto`는 `none`이고, 명시적 draft는 실험 opt-in입니다.
+`profiles.draft`는 제공한 후보 artifact이며 실제 로드를 뜻하지 않습니다.
+선택된 실행 방식은 summary의 `choice.selected_mode`와 status의 `adaptive.mode`로 구분합니다.
+[profile 계약·증거 구분](docs/OPERATIONS.md#explicit-target-profiles)을 참고하세요.
+
+[새 공개 집계](docs/benchmarks/2026-10-13-profiles-summary.json)는 0.6B auto baseline,
+1.7B auto baseline·명시적 draft, 4B auto calibrated draft의 네 독립 replay PASS를
+기록합니다. 각 실행은 source 19개, computed 5개(1 warmup + 4 corpus), 129-token
+요청의 dispatch 전 거부와 cleanup을 확인했습니다. 1.7B의 네 답변 텍스트는 두 실행에서
+같았지만, 한 번의 순차 4-task HTTP 합계는 baseline 8.152742초, draft 11.247127초로
+**draft가 더 느렸습니다**. 반복·교차 통계 벤치마크나 품질 향상 증거는 아닙니다.
 
 ## 증거와 공개 범위
 

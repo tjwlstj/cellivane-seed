@@ -86,9 +86,11 @@ The new [capability module](../hosted/experimental/cellivane_seed/capabilities.p
 and [resource module](../hosted/experimental/cellivane_seed/resources.py)
 are **PARTIAL**. Their first validation passed 26 pure fixtures; the
 [non-executing CLI](../tools/hosted/cellivane_seed_plan.py) passed six synthetic
-fixtures. The specified CPU experiment and its independent replay have now
-passed. The final local Windows suite passed 385 tests with zero skips in
-29.307 seconds; terminal CI remains a separate exact-revision check. These
+fixtures. The specified CPU experiment and its independent replay passed
+in that historical contract/budget/speculation slice. Its local Windows
+suite passed 385 tests with zero skips in 29.307 seconds; this is not the
+current profile slice's count. [The profile follow-up](#explicit-target-profiles-current)
+owns the new source and validation. Terminal CI remains an exact-revision check. These
 immutable records revalidate exact types and
 values when consumed; hashes identify their canonical JSON, not the truth
 of caller-supplied observations or estimates.
@@ -379,6 +381,7 @@ fixtures; they do not execute the real model experiments.
 | [5f19faf](https://github.com/tjwlstj/cellivane-seed/commit/5f19faf9479ff487be041d94695d4b78fe07816d) | [Initial public CI](https://github.com/tjwlstj/cellivane-seed/actions/runs/38191543178): Windows and Ubuntu success, 175 collected each; Ubuntu 15 skipped | Original smoke/export only |
 | [c22a29d](https://github.com/tjwlstj/cellivane-seed/commit/c22a29d90fcf26a1378ad92c1fb31f044b1a33c1) | [CI 38203515952](https://github.com/tjwlstj/cellivane-seed/actions/runs/38203515952): Windows success; Ubuntu failure | A synthetic lifecycle test entered the Windows-only launcher gate |
 | [e763cec](https://github.com/tjwlstj/cellivane-seed/commit/e763cec58686511c35ac1039917902db50f2cc07) | [CI 38203636107](https://github.com/tjwlstj/cellivane-seed/actions/runs/38203636107): both success, 385 collected each; Windows 0 skipped, Ubuntu 15 skipped | Fixture selects the Windows branch with a local mock without changing pathlib's host OS |
+| [e32e224](https://github.com/tjwlstj/cellivane-seed/commit/e32e22419836add56b9fc70a6d91223ac90f59c8) | [CI 38333193360](https://github.com/tjwlstj/cellivane-seed/actions/runs/38333193360): both success, 467 collected each; Windows 0 skipped, Ubuntu 15 skipped | First fixed-4B adaptive startup and audit/status slice; not new target profiles |
 
 The c22a29d failure and e763cec fix concern a mocked control-flow test, not
 Ubuntu model execution. The local 385-test Windows run and the accepted CPU
@@ -388,6 +391,10 @@ CI after publication; none of these historical links validates later bytes.
 Do not predict a future commit's CI success in its own source documentation.
 
 ## Operating and startup-selection follow-up
+
+The results below belong to the published e32e224 source. Its terminal CI
+now appears in the historical table above; it does not cover the new target
+profile contract in the next subsection.
 
 [OPERATIONS](OPERATIONS.md) owns audit limits, capacity monitoring, deadline
 semantics and new-session handling. Session restart does not restore cache
@@ -405,12 +412,12 @@ replay against eighteen runtime/launcher source files and four frozen verifier
 files. Their source snapshots remain separate from the historical calibration.
 The [allowlisted aggregate](benchmarks/2026-10-13-adaptive-summary.json) owns the
 new report/verdict/source hashes and supported claims. Launcher fixtures passed
-18 tests; independent replay fixtures passed 35. The final local Windows suite
+18 tests; independent replay fixtures passed 35. That e32e224 slice's local Windows suite
 passed **467 tests / zero skips / 42.739 seconds**. Its raw regression log stays
 private. These results do not establish new Ubuntu actual-model execution or
 terminal CI success for a future publication. Check the matching commit in the
 [beta workflow](https://github.com/tjwlstj/cellivane-seed/actions/workflows/tests.yml?query=branch%3Abeta).
-The first supported profile is fixed official Qwen3-4B Q8_0 target with optional
+That snapshot's first supported profile is fixed official Qwen3-4B Q8_0 target with optional
 0.6B Q8_0 draft, Windows CPU b11429, context 2048, four threads, one slot,
 cache zero and a 128-token HTTP cap. Do not expand this to generic GGUF support.
 
@@ -439,6 +446,64 @@ passed static AST checks but `-File` was blocked by the test host's existing
 execution policy; it is not a tested policy-independent execution path.
 Do not change system execution policy or add a blanket bypass to make a
 documentation command appear verified.
+
+<a id="explicit-target-profiles-current"></a>
+
+### Explicit target profiles: current verified slice
+
+**Source implementation CURRENT / bounded actual and independent replay PASS / product PARTIAL.**
+The launcher has explicit `0.6b`, `1.7b`, `4b` target profiles, default 4B,
+and a pinned [profile registry](../hosted/experimental/cellivane_seed/profiles.py).
+It reuses the asset downloader's
+immutable Q8_0 pins; bind each target profile and optional draft to recorded
+artifact metadata and execution identity. Fixed alias `cellivane-spec-target`
+must not substitute for that identity. Never automatically downgrade targets.
+
+Only pinned 0.6B may be a draft for the 1.7B/4B targets. A 0.6B target rejects
+drafting, including a same-size draft. Keep CPU context/thread/slot/cache/output
+bounds unchanged. The calibration loader still replays only the fixed historical
+4B/0.6B speculation format. Generation/ingestion of matching 1.7B calibration
+is not implemented, so current 1.7B auto stays baseline. Historical 4B benefit
+cannot qualify it. Explicit 1.7B draft is experimental opt-in; functional smoke
+is separate from repeated/interleaved speed or general equivalence evidence.
+
+The summary is schema 2 with profile/artifact joins and a nineteen-file
+source closure. The verifier source preserves old schema-1/eighteen-file replay with its own source
+snapshots, hashes and verifier rules. New count/schema support is a contract
+change requiring profile-pair/type/identity rejection fixtures, new actual
+acceptance and independent replay. The old aggregate remains unchanged; the
+new [allowlisted profile aggregate](benchmarks/2026-10-13-profiles-summary.json)
+records four actual independent PASS runs against nineteen source files and
+four frozen verifier files. The final local Windows suite passed
+**505 tests / zero skips / 56.439 seconds**. Historical v1/18-file compatibility
+replayed both earlier runs with unchanged saved verdict results. New terminal CI
+must still be checked for the exact source after publication. Do not extend
+e32e224's 467-test local/CI PASS to changed bytes. Runnable usage contracts are in
+[OPERATIONS](OPERATIONS.md#explicit-target-profiles); metadata, actual runs,
+regressions and CI remain separate gates. Source checks confirm
+path-free profile records in status/CLI ready, plus exact basename/size/hash
+enforcement. The optional wrapper adds `-TargetProfile`; its current source
+passed static AST checks. Python remains primary: AST success does not establish
+execution under the host's PowerShell policy.
+Treat `profiles.draft` as candidate artifact metadata, even when selected
+mode is baseline. Read `choice.selected_mode` / `adaptive.mode` for the
+mechanism rather than claiming every provided draft was loaded.
+
+The four smoke runs covered 0.6B auto baseline, 1.7B auto with mismatched
+historical 4B calibration, explicit 1.7B draft, and 4B auto with matching
+calibration. Each had one warmup plus four computed responses, one 129-token
+HTTP rejection before extra dispatch, nineteen audit records and recorded
+owned cleanup. The same-model 0.6B target/draft negative CLI retained its
+expected FAIL before inspection/model launch; it is not an actual generation PASS.
+
+Report the 1.7B observation candidly: four texts matched, but the one-pass
+four-task HTTP total was 8.152742 seconds baseline versus 11.247127 seconds
+draft. Drafting was slower and used a larger owned-primary peak working set.
+These sequential single-pass observations are not a repeated/interleaved
+performance study or general output/quality proof. OS primary-worker counters
+exclude Python, other processes and GPU; they do not establish total RAM use,
+reservation or enforced limits. Keep the full measurement scope beside the
+[operating results](OPERATIONS.md#profile-smoke-results).
 
 ## Upstream and public evidence boundary
 

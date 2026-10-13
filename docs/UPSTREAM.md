@@ -71,7 +71,7 @@ expanding a whole weight matrix to FP16, as described in the pinned
 Cellivane's new contract/budget and actual speculation experiment follow the
 [development guide](DEVELOPMENT_GUIDE.md). The pure declared-budget planner
 is `PARTIAL`; the specified CPU OFF/ON run and its independent recorded-evidence
-replay passed, and the final local Windows suite passed 385 tests with zero
+replay passed, and that historical slice's local Windows suite passed 385 tests with zero
 skips in 29.307 seconds. Publication CI must be checked for the exact published
 revision, independently of those local results.
 Reading these upstream mechanisms does not import code or qualify a backend;
@@ -205,7 +205,7 @@ take that verified engine cache as `--asset-root` and the new GGUF as
 For current responsibility and maturity boundaries, see
 [ARCHITECTURE.md](ARCHITECTURE.md).
 
-The implemented adaptive startup path uses only the existing b11429 CPU
+The e32e224 adaptive startup path used only the existing b11429 CPU
 binary and official 4B target / optional 0.6B draft pins above. No new
 upstream code or artifact pin is introduced. Auto baseline and calibrated
 draft functional smoke and matching-source independent replay passed. The
@@ -213,3 +213,17 @@ historical speculation result is advisory calibration,
 not current-host qualification. The [new aggregate](benchmarks/2026-10-13-adaptive-summary.json)
 records the eighteen runtime/launcher and four verifier hashes separately.
 See [OPERATIONS](OPERATIONS.md#adaptive-startup-selection).
+
+The explicit-target follow-up is **source CURRENT / bounded actual and replay PASS / product PARTIAL**.
+It reuses the same official 0.6B/1.7B/4B Q8_0 pins already catalogued above
+and the same b11429 CPU binary. No new upstream artifact or code import is
+introduced for these profiles. Only 1.7B/4B targets may pair with pinned 0.6B
+draft; a fixed HTTP alias is not model identity. Source/schema joins and new
+actual evidence are separate from acquisition and the historical 4B result.
+The calibration loader still supports only that fixed historical 4B/0.6B
+speculation format, not matching 1.7B calibration generation/ingestion.
+The [profile aggregate](benchmarks/2026-10-13-profiles-summary.json) records
+four matching-source functional smoke/replay PASS results, not general model
+qualification or improved performance. Its 1.7B explicit draft was slower
+than baseline on the recorded sequential four-task smoke despite matching text.
+See [profile usage](OPERATIONS.md#explicit-target-profiles).

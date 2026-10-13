@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Start one owned CPU worker after budget and advisory calibration selection.
 
-The first supported profile is pinned Qwen3-4B / optional Qwen3-0.6B, llama.cpp
-b11429, context 2048, four threads, one slot, greedy output <=128 tokens. Auto
+Explicit target profiles are pinned Qwen3-0.6B, 1.7B or 4B Q8_0. Optional 0.6B
+draft is accepted for the 1.7B/4B target. The CPU profile uses llama.cpp b11429,
+context 2048, four threads, one slot, greedy output <=128 tokens. Auto
 chooses once before launch. It never retries a dispatched request, dynamically
 switches speculation, changes quantization, or promises a speed improvement.
 Raw local run records contain prompts, responses, logs and filesystem paths.
@@ -32,11 +33,14 @@ from cellivane_bridge.storage import encoded, local_root, read_json
 from cellivane_seed.adaptive import Calibration, StartupChoice, settings_identity
 from cellivane_seed.capabilities import BackendCapabilities
 from cellivane_seed.core import InvalidRequest, SeedEngine
+from cellivane_seed.profiles import (ModelProfile, PROFILE_NAMES, get_profile,
+                                    identify_profile, validate_pair)
 from cellivane_seed.resources import ExecutionDemand, ResourceBudget, plan_admission
 from cellivane_seed.server import Audit, Backend, SeedHTTPServer
 
 SOURCE_PATHS = tuple(sorted(set(spec.SOURCE_PATHS) | {
     "hosted/experimental/cellivane_seed/adaptive.py",
+    "hosted/experimental/cellivane_seed/profiles.py",
     "tools/hosted/cellivane_seed_adaptive.py",
     *{"tools/hosted/" + n + ".py" for n in (
         "verify_cellivane_speculation", "verify_cellivane_comparison", "verify_cellivane_bridge")},
@@ -46,11 +50,23 @@ SOURCE_PATHS = tuple(sorted(set(spec.SOURCE_PATHS) | {
 class BoundedSeedEngine(SeedEngine):
     """Enforce this admitted profile before allocating a compute lease."""
 
-    def __init__(self, backend, *, choice, **kwargs):
+    def __init__(self, backend, *, choice, target_profile=None, draft_profile=None, **kwargs):
         if type(choice) is not StartupChoice or choice.selected is None:
             raise ValueError("adaptive-start-blocked")
         choice.selected.require_admitted()
+        if target_profile is not None:
+            validate_pair(target_profile, draft_profile)
+            demand = choice.baseline.demand
+            if (demand.target_sha256, demand.target_bytes) != (target_profile.sha256, target_profile.bytes):
+                raise ValueError("adaptive-target-profile-demand-mismatch")
+            if (choice.draft is not None) != (draft_profile is not None):
+                raise ValueError("adaptive-draft-profile-demand-mismatch")
+            if draft_profile is not None and (choice.draft.demand.draft_sha256, choice.draft.demand.draft_bytes) != (draft_profile.sha256, draft_profile.bytes):
+                raise ValueError("adaptive-draft-profile-demand-mismatch")
+        elif draft_profile is not None:
+            raise ValueError("adaptive-target-profile-required")
         self._choice = choice
+        self._profiles = (target_profile, draft_profile)
         super().__init__(backend, **kwargs)
 
     def _request(self, payload):
@@ -61,11 +77,41 @@ class BoundedSeedEngine(SeedEngine):
 
     def status(self):
         mode, reason = self._choice.decision()
-        return {**super().status(), "adaptive": {
+        return {**super().status(), **({"profiles": profile_records(*self._profiles)} if self._profiles[0] else {}), "adaptive": {
             "policy": self._choice.policy, "mode": mode, "reason": reason,
             "expected_output_tokens": self._choice.expected_output_tokens,
             "maximum_output_tokens": self._choice.maximum_output_tokens,
             "choice_sha256": self._choice.sha256, "per_request_switching": False}}
+
+
+def profile_records(target, draft=None):
+    validate_pair(target, draft)
+    return {"target": target.record(), "draft": draft.record() if draft else None}
+
+
+def model_profiles(models):
+    target = identify_profile(models["target"]["bytes"], models["target"]["sha256"])
+    draft = identify_profile(models["draft"]["bytes"], models["draft"]["sha256"]) if "draft" in models else None
+    validate_pair(target, draft)
+    return target, draft
+
+
+def checked_model(value, profile):
+    if type(profile) is not ModelProfile:
+        raise ValueError("model-profile-exact-type")
+    profile.validate()
+    path = Path(value)
+    local_root(path.parent)
+    if not path.is_file() or path.name != profile.filename:
+        raise ValueError("model-profile-file-required:" + profile.name)
+    before = path.lstat()
+    if (path.is_symlink() or getattr(before, "st_file_attributes", 0) & 0x400
+            or before.st_size != profile.bytes or assets.file_sha256(path) != profile.sha256):
+        raise ValueError("model-profile-file-pin-mismatch:" + profile.name)
+    after = path.stat()
+    if (before.st_size, before.st_mtime_ns, before.st_ino) != (after.st_size, after.st_mtime_ns, after.st_ino):
+        raise ValueError("model-profile-file-changed-during-hash")
+    return {"path": str(path.resolve(strict=True)), "bytes": profile.bytes, "sha256": profile.sha256}
 
 
 def source_hashes():
@@ -152,8 +198,9 @@ def status_exchange(port):
 def validate_inputs(prepared, models, hashes):
     if source_hashes() != hashes:
         raise ValueError("adaptive-source-pin-mismatch")
+    profiles = dict(zip(("target", "draft"), model_profiles(models)))
     for kind, model in models.items():
-        if spec.checked_model(model["path"], kind) != model:
+        if checked_model(model["path"], profiles[kind]) != model:
             raise ValueError("adaptive-model-pin-mismatch:" + kind)
     if assets.prepare_assets(Path(prepared["directory"]).parent, download=False) != prepared:
         raise ValueError("adaptive-assets-pin-mismatch")
@@ -199,6 +246,7 @@ def run_selected(args, root, evidence, prepared, models, config, hashes, calibra
         for port in ports:
             lab.port_free(port)
         validate_inputs(prepared, models, hashes)
+        target_profile, draft_profile = model_profiles(models)
         # This is the final mutable-host observation before the owned launch.
         snapshot = spec.memory_snapshot()
         choice = choose(prepared, models, config, snapshot, policy=args.policy,
@@ -230,6 +278,7 @@ def run_selected(args, root, evidence, prepared, models, config, hashes, calibra
                     f"http://127.0.0.1:{args.worker_port}/v1", config["alias"],
                     timeout_s=90, max_tokens=128), audit)
                 engine = BoundedSeedEngine(backend, choice=choice, model=config["alias"],
+                    target_profile=target_profile, draft_profile=draft_profile,
                     identity=admission.sha256, cache_entries=0, timeout_s=90,
                     event_sink=lambda event: audit.append("scheduler", event))
                 server = SeedHTTPServer(("127.0.0.1", args.port), engine, audit)
@@ -238,6 +287,7 @@ def run_selected(args, root, evidence, prepared, models, config, hashes, calibra
                 print(json.dumps({"ready": True, "url": f"http://127.0.0.1:{args.port}/v1",
                     "mode": mode, "reason": reason, "choice_sha256": choice.sha256,
                     "maximum_output_tokens": 128, "audit": audit.status(),
+                    "profiles": profile_records(target_profile, draft_profile),
                     "run_directory": str(evidence)}, ensure_ascii=False), flush=True)
                 if args.mode == "smoke":
                     phase["warmup"] = spec.request_record(args.port, config, "Reply with only OK.", audit)
@@ -280,7 +330,8 @@ def run_selected(args, root, evidence, prepared, models, config, hashes, calibra
                 phase["ports_closed"][str(port)] = False
         try:
             phase["source_unchanged_during_run"] = source_hashes() == hashes
-            phase["models_unchanged_during_run"] = all(spec.checked_model(m["path"], k) == m for k, m in models.items())
+            current_profiles = dict(zip(("target", "draft"), model_profiles(models)))
+            phase["models_unchanged_during_run"] = all(checked_model(m["path"], current_profiles[k]) == m for k, m in models.items())
             phase["backend_assets_unchanged_during_run"] = assets.prepare_assets(
                 Path(prepared["directory"]).parent, download=False) == prepared
             if not all(phase[k] for k in ("source_unchanged_during_run", "models_unchanged_during_run",
@@ -310,6 +361,7 @@ def main(argv=None):
     parser.add_argument("--expected-output-tokens", type=int, default=128)
     parser.add_argument("--asset-root", required=True)
     parser.add_argument("--target-file", required=True)
+    parser.add_argument("--target-profile", choices=PROFILE_NAMES, default="4b")
     parser.add_argument("--draft-file")
     parser.add_argument("--calibration-file")
     parser.add_argument("--calibration-source-root")
@@ -328,7 +380,8 @@ def main(argv=None):
     evidence = local_root(root / "adaptive-runs") / str(uuid4())
     evidence.mkdir(exist_ok=False)
     hashes = source_hashes()
-    summary = {"schema_version": 1, "experiment": "cellivane-seed-adaptive", "run_id": evidence.name,
+    summary = {"schema_version": 2, "experiment": "cellivane-seed-adaptive", "run_id": evidence.name,
+        "profiles": None,
         "configuration": spec.configuration(1, 128), "configuration_sha256": None,
         "models": None, "backend_assets": None, "source_sha256": hashes,
         "source_snapshot": str(evidence / "source-snapshot"), "calibration_validation": None,
@@ -340,9 +393,13 @@ def main(argv=None):
         summary["configuration_sha256"] = spec.digest(config)
         prepared = assets.prepare_assets(args.asset_root, download=False)
         summary["backend_assets"] = prepared
-        models = {"target": spec.checked_model(args.target_file, "target")}
+        target_profile = get_profile(args.target_profile)
+        draft_profile = get_profile("0.6b") if args.draft_file else None
+        validate_pair(target_profile, draft_profile)
+        summary["profiles"] = profile_records(target_profile, draft_profile)
+        models = {"target": checked_model(args.target_file, target_profile)}
         if args.draft_file:
-            models["draft"] = spec.checked_model(args.draft_file, "draft")
+            models["draft"] = checked_model(args.draft_file, draft_profile)
         summary["models"] = models
         calibration, summary["calibration_validation"] = load_calibration(args.calibration_file, args.calibration_source_root)
         if args.mode == "plan":

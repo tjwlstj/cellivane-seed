@@ -162,15 +162,17 @@ official URL, allowlisted aggregate와 해시를 사용합니다.
 ## CPU 시작 모드 선택
 
 [정책](../hosted/experimental/cellivane_seed/adaptive.py)과
-[launcher](../tools/hosted/cellivane_seed_adaptive.py)의 구현은 **CURRENT**입니다.
+[launcher](../tools/hosted/cellivane_seed_adaptive.py)의 아래 첫 구현·실측은
+**e32e224 snapshot의 역사적 검증 범위**입니다. 새 target profile 절과 구분합니다.
 정책 fixture 24 tests와 audit·상태 회귀 24 tests가 통과했습니다.
 Auto baseline과 calibrated draft의 실제 기능 smoke 및 독립 기록 재판독은 **PASS**입니다.
-최종 로컬 Windows 전체 회귀는 **467 PASS / 0 skip / 42.739초**이며 프로젝트는 PARTIAL입니다.
+해당 e32e224 slice의 로컬 Windows 회귀는 **467 PASS / 0 skip / 42.739초**였습니다.
+현재 profile 확장의 505-test 결과는 아래 별도 절에 있으며 프로젝트는 PARTIAL입니다.
 Launcher fixture 18개와 독립 replay fixture 35개도 통과했습니다. 공개 revision의 CI는
 [beta fixture workflow](https://github.com/tjwlstj/cellivane-seed/actions/workflows/tests.yml?query=branch%3Abeta)에서
 해당 commit의 terminal 결과로 확인해야 하며 이전 e763cec CI와 구분합니다.
 
-첫 지원 범위는 pinned llama.cpp b11429, 공식 Qwen3-4B Q8_0 target과 선택적
+그 snapshot의 첫 지원 범위는 pinned llama.cpp b11429, 공식 Qwen3-4B Q8_0 target과 선택적
 Qwen3-0.6B Q8_0 draft입니다. CPU, context 2048, thread 4, slot 1, cache 0,
 greedy generation 최대 128 token을 고정합니다. Input 계약은 기존 Seed subset을
 유지하되 HTTP `max_tokens > 128`은 backend dispatch 전에 400으로 거부합니다.
@@ -223,7 +225,7 @@ source-file replay PASS를 요구합니다. 파일·재판독 실패는 임의�
 `plan`은 backend generation 없이 파일·RAM을 검사하고 `adaptive-runs/<id>/adaptive.json`
 및 source snapshot을 기록합니다. `smoke`는 warmup 1개와 4개 task, 129-token 부정 요청,
 status·cleanup을 기록합니다. Producer COMPLETED와 독립 PASS는 같은 verdict가 아닙니다.
-## 현재 기능 smoke의 검증 범위
+## e32e224 기능 smoke의 검증 범위
 
 [Allowlisted 집계](benchmarks/2026-10-13-adaptive-summary.json)의 두 실행은 각각
 warmup 1개 + corpus 4개가 HTTP 200 computed로 끝났고 독립 replay PASS였습니다.
@@ -271,6 +273,102 @@ py -3 -B tools/hosted/verify_cellivane_adaptive.py $taskReport --source-root $ta
 
 이 verifier의 PASS 범위는 recorded startup integrity와 semantic replay이며 endpoint/PID
 인증·실제 backend 자격·OS 메모리 강제·현재 host의 가속 보장이 아닙니다.
+
+<a id="explicit-target-profiles"></a>
+
+## 명시적 target profile 확장
+
+**소스 구현 CURRENT / 기능 smoke·독립 replay PASS / 제품 PARTIAL:** 이 slice는 사용자가
+`--target-profile 0.6b|1.7b|4b`로 target을 고릅니다. 기본값은 기존 호환 `4b`입니다.
+동일한 CPU b11429/context 2048/thread 4/slot 1/cache 0/max 128 계약을 유지합니다.
+엔진이 RAM이나 요청 내용에 따라 더 작은 target으로 자동 교체하지 않습니다.
+선택한 model의 정답률이나 품질을 보증하지 않습니다.
+
+| Target profile | 정확한 공식 Q8_0 artifact | 허용 draft | 새 검증 상태 |
+|---|---|---|---|
+| `0.6b` | Qwen3-0.6B, 639,446,688 bytes | 없음; 동일 0.6B draft도 거부 | Auto baseline 독립 PASS |
+| `1.7b` | Qwen3-1.7B, 1,834,426,016 bytes | Pinned Qwen3-0.6B만 | Auto baseline·명시적 draft 독립 PASS |
+| `4b` | Qwen3-4B, 4,280,404,704 bytes | Pinned Qwen3-0.6B만 | Schema 2/source 19의 auto calibrated draft 독립 PASS |
+
+Artifact의 immutable revision·SHA는 [UPSTREAM](UPSTREAM.md#immutable-official-qwen3-model-artifacts)가
+담당합니다. Target profile은 정확한 pinned basename·byte 수·SHA 모두와 일치해야 합니다.
+파일명만으로 모델을 추정하거나 다른 파일을 조용히 선택하지 않습니다.
+지원 목록 밖의 draft, 같은 크기 또는 더 큰 draft는
+기동 전에 거부하는 계약입니다. `--target-profile`은 tensor backend 자체의 임의
+모델 지원을 선언하는 인자가 아닙니다.
+
+HTTP alias는 모든 profile에서 `cellivane-spec-target`으로 유지합니다.
+`/v1/models`의 alias만 보고 0.6B/1.7B/4B를 추정하지 마세요. 선택 profile과 artifact
+metadata·hash·계획의 identity로 실제 모델을 구분합니다. Schema-2 `/v1/status`와 CLI
+ready 출력의 top-level `profiles`는 `target` record와 `draft` record 또는 null을 제공합니다.
+각 record는 `schema_version`, `name`, `filename`, `bytes`, `sha256`, `scope`이며
+scope는 `pinned-model-artifact-not-backend-qualification`입니다. 절대경로는 포함하지 않습니다.
+`profiles.draft`는 입력으로 제공한 후보 artifact입니다. Baseline `none`을 선택하면
+이 값이 있어도 draft model을 로드하지 않을 수 있습니다. Summary `choice.selected_mode`와
+status `adaptive.mode`가 선택한 실행 방식을 나타내며 metadata만으로 loaded instance를 추정하지 않습니다.
+Model 크기는 다른데 같은
+alias를 사용하는 것이 동일 weight 또는 calibration이라는 뜻은 아닙니다.
+
+기본 `auto`는 matching calibration이 없으면 baseline입니다. 과거 4B calibration은
+1.7B target의 근거가 될 수 없으며 identity가 다르면 `none`을 선택합니다.
+현재 loader는 기존 고정 4B target/0.6B draft raw speculation 형식만 독립 재판독합니다.
+1.7B matching calibration을 생성하거나 입력하는 경로는 아직 구현하지 않았으므로
+현재 1.7B `auto`는 baseline입니다. 새 profile smoke의 `adaptive.json`이나 public aggregate를
+calibration으로 대신 넣을 수 없습니다. 미지원 형식의 입력은 거부하며 자동 fallback으로 숨기지 않습니다.
+1.7B + 0.6B 명시적 `--policy draft`는 calibration benefit 조건을 요구하지 않는
+실험 opt-in 경로입니다. 기능 smoke를 일반적인 동일출력·가속 보장으로 확장하지 않습니다.
+
+README의 0.6B/1.7B 준비·plan·serve 예시는 완전한 변수와 공식 catalog를 사용합니다.
+기존 4B target은 새 CLI에서 명시적으로 다음처럼 선택할 수 있습니다.
+
+```powershell
+py -3 -B tools/hosted/cellivane_seed_adaptive.py --mode plan --target-profile 4b --policy auto --asset-root $taskAssets --target-file $taskTarget
+py -3 -B tools/hosted/cellivane_seed_adaptive.py --mode smoke --target-profile 1.7b --policy draft --asset-root $taskAssets --target-file $taskSmall --draft-file $taskTiny
+```
+
+후속 raw summary는 schema 2의 profile/artifact identity join과 19-file source closure를
+기록합니다. 독립 verifier의 소스도 역사적 schema 1/18-file 증거를 원래 계약으로
+읽도록 확장했습니다. 기존 두 v1 run의 matching snapshot replay도 이전 verdict와
+동일했습니다. 이전 aggregate·source hash를 새 값으로 덮어쓰지 않았습니다.
+Schema·file count 증가 자체는 실행 성공이 아니므로 새 actual·회귀와 역사 CI를 구분합니다.
+
+<a id="profile-smoke-results"></a>
+
+## 현재 profile smoke 결과
+
+[공개 집계](benchmarks/2026-10-13-profiles-summary.json)의 네 schema-2 run은 동일하게
+동결된 19-file runtime/launcher source에서 실행했고 독립 replay PASS였습니다.
+원본 report/verdict와 verifier 4개 snapshot은 private evidence에 보존합니다.
+총 computed 응답은 20개(4 warmup + 16 corpus), 각 run은 HTTP 200 응답 5개,
+129-token 요청의 HTTP 400 사전 거부 1개, 추가 backend dispatch 0, audit records 19개와
+소유 Job active 0·port closure를 확인했습니다. 최종 Windows 전체 회귀는
+**505 PASS / 0 skip / 56.439초**입니다. 이 변경의 공개 revision CI는 게시 후
+[beta workflow](https://github.com/tjwlstj/cellivane-seed/actions/workflows/tests.yml?query=branch%3Abeta)에서
+해당 commit의 terminal 결과로 확인해야 합니다.
+
+| Target / policy | 선택 mode | 4-task HTTP 합계 | 소유 primary peak working set | 독립 replay |
+|---|---|---:|---:|---|
+| 0.6B / auto | none | 4.517928초 | 0.885 GiB | PASS |
+| 1.7B / auto + 기존 4B calibration | none | 8.152742초 | 2.001 GiB | PASS |
+| 1.7B / 명시적 draft | draft | 11.247127초 | 2.872 GiB | PASS |
+| 4B / auto + matching calibration | draft | 17.128861초 | 5.220 GiB | PASS |
+
+0.6B는 `draft-missing`, 1.7B auto는 `calibration-identity-mismatch`, 4B auto는
+`calibrated-advisory-benefit`로 선택했습니다. 1.7B auto가 baseline인 것은 현재
+calibration 계약의 결과이며, 이 smoke의 속도를 측정해 자동 mode를 바꾼 것이 아닙니다.
+1.7B의 두 실행은 네 task의 텍스트가 4/4 같았으나 draft HTTP 합계가 더 컸습니다.
+1.7B draft counter는 188 offered / 97 accepted, 4B는 148 / 122이며 warmup을 포함합니다.
+
+시간은 각 profile의 **한 번의 순차 4-task HTTP 합계**로 prefill·generation·동기 audit를
+포함하고 startup·warmup은 제외합니다. 반복·교차 순서 비교나 decoder-only throughput이
+아니므로 새로운 일반 속도·정확도·품질 보장으로 확장하지 않습니다. 메모리는 OS가 읽은
+**소유 primary worker의 peak working set**만입니다. Python·다른 프로세스·GPU를 제외하며
+전체 RAM 요구량, tensor residency 또는 예약·강제 상한을 뜻하지 않습니다.
+
+동일 0.6B target/draft 조합의 부정 CLI 입력은 inspection·model launch 전에 거부됐고
+원본 producer FAIL과 source를 보존했습니다. 기대된 미지원 거부를 성공 모델 실행으로
+승격하지 않습니다. 공개 집계 SHA-256은
+`32a8b15ddaad4124ef802dc42ea0ba9c5e9c55fa52ef2dae910656214b908303`입니다.
 
 ## 아직 지원하지 않는 운영 기능
 

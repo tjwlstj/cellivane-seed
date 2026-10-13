@@ -252,7 +252,7 @@ Seed's result cache and same-key coalescing do not implement token drafting,
 and Strata's model-specific native MTP is not inherited by a dense backend.
 Actual external-backend speculation was observed; generalized backend
 qualification, endpoint-PID attestation and quality claims remain false.
-The final local Windows regression passed 385 tests with zero skips in
+That historical contract/budget/speculation regression passed 385 local Windows tests with zero skips in
 29.307 seconds. Verify terminal fixture-workflow results for the exact
 published revision separately from these local results;
 the [development guide](DEVELOPMENT_GUIDE.md#current-slice-contract-budget-and-speculation)
@@ -261,12 +261,16 @@ validate this changed source or extend this bounded speculation result.
 
 ## CPU startup selection
 
+This section describes the historical
+[e32e224 snapshot](https://github.com/tjwlstj/cellivane-seed/commit/e32e22419836add56b9fc70a6d91223ac90f59c8).
+The new explicit-target follow-up below is a separate evidence boundary.
+
 The [startup policy](../hosted/experimental/cellivane_seed/adaptive.py) and
 [launcher](../tools/hosted/cellivane_seed_adaptive.py) are implemented
 **CURRENT**, with 24 pure policy fixtures passed. Actual functional smoke and
 independent recorded-evidence replay passed for auto baseline and calibrated
-draft, with matching eighteen-file runtime/launcher source. The final local
-Windows suite passed 467 tests with zero skips in 42.739 seconds. The product
+draft, with matching eighteen-file runtime/launcher source. That e32e224 slice's
+local Windows suite passed 467 tests with zero skips in 42.739 seconds. The product
 remains PARTIAL; published CI is a separate exact-revision check.
 The first fixed profile is Qwen3-4B Q8_0 target / optional 0.6B Q8_0 draft,
 pinned llama.cpp b11429, Windows CPU, context 2048, four threads, one slot,
@@ -286,3 +290,44 @@ not validate this follow-up. The [adaptive aggregate](benchmarks/2026-10-13-adap
 records functional selection, bounded dispatch and cleanup, not a new paired
 speed or quality comparison. The supplemental 30-second serve check is outside
 the five-request smoke replay contract.
+
+## Explicit target profiles follow-up
+
+**Source implementation CURRENT / bounded actual and independent replay PASS / product PARTIAL:** the launcher adds
+`--target-profile 0.6b|1.7b|4b`, default `4b`, bound to exact official Q8_0
+file sizes/hashes. A 0.6B target has no draft; 1.7B/4B may explicitly use only
+the pinned 0.6B draft. Same/larger draft pairs are rejected. CPU context 2048,
+four threads, one slot, cache zero and the 128-token HTTP cap stay fixed.
+There is no automatic target selection, quality downgrade or generic model claim.
+
+The HTTP model alias remains `cellivane-spec-target`; it is compatibility
+metadata, not the actual artifact identity. The schema-2 summary joins
+target profile, artifact and plan with nineteen source files. The current
+verifier source retains the original schema-1/eighteen-file interpretation for
+old evidence. The current calibration loader accepts only the fixed historical
+4B/0.6B speculation format; creating/ingesting a matching 1.7B calibration is
+not implemented. Consequently current 1.7B `auto` stays baseline and explicit
+1.7B draft is an experimental opt-in, not evidence of benefit.
+See [OPERATIONS](OPERATIONS.md#explicit-target-profiles) for profile boundaries
+and commands. Status and CLI ready metadata expose path-free `profiles`
+records; pinned basename, byte count and hash must all match the selected
+profile. `profiles.draft` is a supplied candidate artifact, not proof of a
+loaded draft; `choice.selected_mode` in the summary and `adaptive.mode` in
+status identify the selected mechanism. The e32e224 runs do not validate
+the modified launcher/verifier.
+
+The new [profile aggregate](benchmarks/2026-10-13-profiles-summary.json)
+records four independent replay PASS runs with matching nineteen-file source:
+0.6B auto baseline, 1.7B auto baseline, explicit 1.7B draft, and calibrated
+4B auto draft. Each had five computed responses including one warmup,
+pre-dispatch rejection of the 129-token request and recorded cleanup.
+Historical schema-1/eighteen-file replay retained both earlier verdicts.
+The final local Windows suite passed 505 tests with zero skips in 56.439 seconds;
+new publication CI remains an exact-revision check.
+
+On the one-pass four-task 1.7B smoke, draft took 11.247127 seconds versus
+8.152742 seconds baseline despite four equal text pairs. This was slower,
+not a repeated/interleaved speed benchmark or a quality improvement.
+Owned-primary peak working set excludes Python, other processes and GPU;
+it is not a total memory reservation. [OPERATIONS](OPERATIONS.md#profile-smoke-results)
+owns the complete functional results and measurement limits.

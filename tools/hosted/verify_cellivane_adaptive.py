@@ -27,6 +27,17 @@ SOURCE_PATHS = spec.SOURCE_PATHS | {
     *{"tools/hosted/" + n + ".py" for n in (
         "verify_cellivane_speculation", "verify_cellivane_comparison", "verify_cellivane_bridge")},
 }
+SOURCE_PATHS_V2 = SOURCE_PATHS | {"hosted/experimental/cellivane_seed/profiles.py"}
+# Independent immutable registry. Producer profile declarations are evidence,
+# never authority to expand this reader's supported artifact or draft subset.
+CATALOG = {
+    "0.6b": ("Qwen3-0.6B-Q8_0.gguf", 639446688,
+        "9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031"),
+    "1.7b": ("Qwen3-1.7B-Q8_0.gguf", 1834426016,
+        "061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a"),
+    "4b": ("Qwen3-4B-Q8_0.gguf", 4280404704,
+        "8c2f07f26af9747e41988551106f149b03eb9b5cb6df636027b6bf6278473300"),
+}
 SETTINGS = ("profile", "threads", "context", "slots", "cache_entries", "max_tokens",
     "temperature", "seed", "no_think", "reasoning_format", "draft_max", "draft_min",
     "draft_sampling", "cache_prompt")
@@ -48,20 +59,37 @@ def absolute_path(value):
     return safe_path(value)
 
 
-def verify_models(models):
+def verify_models(models, profiles=None):
     check(type(models) is dict and set(models) in ({"target"}, {"target", "draft"}), "model-fields")
+    if profiles is not None:
+        keys(profiles, ("target", "draft"), "profile-fields")
+        check((profiles["draft"] is not None) == ("draft" in models), "profile-draft-model-join")
+        for kind in models:
+            profile = profiles[kind]
+            check(type(profile) is dict and type(profile.get("name")) is str
+                  and profile["name"] in CATALOG, "profile-name")
+            filename, size, model_sha = CATALOG[profile["name"]]
+            check(same(profile, {"schema_version": 1, "name": profile["name"], "filename": filename,
+                "bytes": size, "sha256": model_sha, "scope": "pinned-model-artifact-not-backend-qualification"}),
+                "profile-catalog-binding")
+        if "draft" in models:
+            check(profiles["draft"]["name"] == "0.6b" and profiles["target"]["name"] in ("1.7b", "4b")
+                  and models["target"]["sha256"] != models["draft"]["sha256"], "unsupported-profile-pair")
     for kind, row in models.items():
         keys(row, ("path", "bytes", "sha256"), "model-record-fields")
-        pin = spec.MODEL_PINS[kind]
+        pin = spec.MODEL_PINS[kind] if profiles is None else CATALOG[profiles[kind]["name"]][1:]
         check(type(row["bytes"]) is int and (row["bytes"], row["sha256"]) == pin, "model-pin")
         path = absolute_path(row["path"])
+        if profiles is not None:
+            check(path.name == profiles[kind]["filename"], "profile-path-filename")
         check(path.suffix.lower() == ".gguf" and path.is_file() and path.stat().st_size == pin[0]
               and spec.file_hash(path) == pin[1], "model-file-changed")
 
 
 def verify_sources(summary, source_root):
     sources = summary["source_sha256"]
-    check(type(sources) is dict and set(sources) == SOURCE_PATHS
+    expected = SOURCE_PATHS_V2 if summary["schema_version"] == 2 else SOURCE_PATHS
+    check(type(sources) is dict and set(sources) == expected
           and all(hex_digest(value) for value in sources.values()), "source-closure")
     snapshot = absolute_path(summary["source_snapshot"])
     root = absolute_path(str(source_root)) if source_root is not None else snapshot
@@ -292,6 +320,8 @@ def verify_rows(phase, summary):
         "closed": False, "poisoned": False, "slots": 1, "active": 0, "inflight": 0, "waiters": 0,
         "max_waiters": 8, "cache_entries": 0, "cache_bytes": 0, "cache_entries_limit": 0,
         "cache_bytes_limit": 1048576, **counters, "event_seq": sequence, "adaptive": adaptive_status(summary)}
+    if summary["schema_version"] == 2:
+        state["profiles"] = summary["profiles"]
     status = phase["status_response"]
     exchange(status)
     expected_status = {**state, "tensor_backend": "external-openai-subset", "token_mtp": False,
@@ -319,17 +349,20 @@ def verify_inspection(assets):
 
 def replay(summary_path, source_root=None):
     summary = load(raw_file(summary_path, 32 * 1024**2))
+    version = summary.get("schema_version")
+    check(type(version) is int and version in (1, 2), "adaptive-schema-version")
     keys(summary, ("schema_version", "experiment", "run_id", "configuration", "configuration_sha256",
         "models", "backend_assets", "source_sha256", "source_snapshot", "calibration_validation", "choice",
-        "choice_sha256", "phase", "launch_mode", "outcome", "error"), "summary-fields")
-    check(type(summary["schema_version"]) is int and summary["schema_version"] == 1
-          and summary["experiment"] == "cellivane-seed-adaptive" and summary["launch_mode"] == "smoke"
+        "choice_sha256", "phase", "launch_mode", "outcome", "error", *(["profiles"] if version == 2 else [])), "summary-fields")
+    check(summary["experiment"] == "cellivane-seed-adaptive" and summary["launch_mode"] == "smoke"
           and summary["outcome"] == "COMPLETED" and summary["error"] is None, "adaptive-smoke-incomplete")
     check(str(UUID(summary["run_id"])) == summary["run_id"], "run-uuid")
     check(same(summary["configuration"], CONFIGURATION)
           and summary["configuration_sha256"] == digest(CONFIGURATION), "configuration-binding")
     verify_sources(summary, source_root)
-    verify_models(summary["models"])
+    if version == 2:
+        check(type(summary["profiles"]) is dict, "profile-fields")
+    verify_models(summary["models"], summary["profiles"] if version == 2 else None)
     identity = spec.verify_assets(summary["backend_assets"])
     verify_inspection(summary["backend_assets"])
     calibration = verify_calibration(summary["calibration_validation"])
@@ -346,7 +379,14 @@ def replay(summary_path, source_root=None):
           and phase["outcome"] == "COMPLETED" and phase["error"] is None
           and phase["identity"] == digest(selected) and same(phase["admission"], selected)
           and all(same(phase[name], selected[name]) for name in ("capabilities", "budget", "demand")), "phase-choice-binding")
-    spec.verify_plan(phase, summary, identity)
+    if version == 1:
+        # Historical v1 keeps the original fixed-4B speculation plan contract.
+        spec.verify_plan(phase, summary, identity)
+    else:
+        # verify_choice already independently recomputed both dynamic plans;
+        # the exact selected-plan/phase joins above include every capability,
+        # model, configuration, byte allowance and admission field.
+        verify_admission(phase["admission"], summary, identity, phase["mode"])
     spec.verify_command(phase, summary)
     spec.verify_cleanup([phase["cleanup"]])
     spec.verify_owned_memory(phase["owned_memory"])
@@ -361,7 +401,8 @@ def replay(summary_path, source_root=None):
     check(phase["mode"] != "none" or not observed["draft_attempt_observed"], "unexpected-baseline-speculation")
     spec.verify_counter_budget(observed, phase, CONFIGURATION)
     return {"outcome": "PASS", "scope": "recorded-adaptive-startup-integrity-and-semantic-replay",
-        "source_files_checked": True, "source_file_count": len(SOURCE_PATHS), "selected_mode": phase["mode"],
+        "source_files_checked": True, "source_file_count": len(SOURCE_PATHS_V2 if version == 2 else SOURCE_PATHS),
+        "selected_mode": phase["mode"],
         "reason": summary["choice"]["reason"], "choice_sha256": summary["choice_sha256"],
         "computed_responses": 5, "rejected_before_dispatch": 1, "audit_records": 19,
         "calibration_replayed": calibration is not None, "calibration_scope": "advisory-historical-not-current-host-qualification",

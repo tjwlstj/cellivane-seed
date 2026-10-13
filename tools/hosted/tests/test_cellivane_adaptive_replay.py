@@ -114,24 +114,46 @@ class SyntheticAssets:
             path.write_bytes(b"SYNTHETIC GGUF FIXTURE " + kind.encode())
             self.models[kind] = file_record(path)
             self.pins[kind] = (self.models[kind]["bytes"], self.models[kind]["sha256"])
+        self.profile_models, self.catalog = {}, {}
+        for name, filename in (("0.6b", "Qwen3-0.6B-Q8_0.gguf"), ("1.7b", "Qwen3-1.7B-Q8_0.gguf"),
+                ("4b", "Qwen3-4B-Q8_0.gguf")):
+            path = self.root / filename
+            path.write_bytes(b"SYNTHETIC NAMED PROFILE " + name.encode())
+            record = file_record(path)
+            self.profile_models[name] = record
+            self.catalog[name] = (filename, record["bytes"], record["sha256"])
+
+    def profile(self, name):
+        filename, size, model_sha = self.catalog[name]
+        return {"schema_version": 1, "name": name, "filename": filename, "bytes": size, "sha256": model_sha,
+            "scope": "pinned-model-artifact-not-backend-qualification"}
 
 
 class Fixture:
-    def __init__(self, root, assets, mode="none", policy="none", reason="explicit-none", with_draft=True):
+    def __init__(self, root, assets, mode="none", policy="none", reason="explicit-none", with_draft=True,
+                 target_profile=None):
         self.root, self.assets = Path(root), assets
         snapshot = self.root / "source-snapshot"
         self.sources = {}
-        for name in v.SOURCE_PATHS:
+        for name in v.SOURCE_PATHS if target_profile is None else v.SOURCE_PATHS_V2:
             path = snapshot / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"# synthetic source closure fixture: " + name.encode())
             self.sources[name] = sha256(path.read_bytes()).hexdigest()
         models = copy.deepcopy(assets.models if with_draft else {"target": assets.models["target"]})
-        self.summary = {"schema_version": 1, "experiment": "cellivane-seed-adaptive", "run_id": str(uuid4()),
+        if target_profile is not None:
+            models = {"target": copy.deepcopy(assets.profile_models[target_profile])}
+            if with_draft:
+                models["draft"] = copy.deepcopy(assets.profile_models["0.6b"])
+        self.summary = {"schema_version": 1 if target_profile is None else 2,
+            "experiment": "cellivane-seed-adaptive", "run_id": str(uuid4()),
             "configuration": copy.deepcopy(CONFIG), "configuration_sha256": digest(CONFIG), "models": models,
             "backend_assets": copy.deepcopy(assets.record), "source_sha256": self.sources,
             "source_snapshot": str(snapshot), "calibration_validation": None, "choice": None,
             "choice_sha256": None, "phase": None, "launch_mode": "smoke", "outcome": "COMPLETED", "error": None}
+        if target_profile is not None:
+            self.summary["profiles"] = {"target": assets.profile(target_profile),
+                "draft": assets.profile("0.6b") if with_draft else None}
         caps = {"schema_version": 1, "backend": "llama.cpp", "engine_identity": assets.engine,
             "declared_modes": ["draft", "none"], "declared_placements": ["cpu"], "observed_modes": [],
             "observed_placements": [], "evidence_sha256": None, "nonstream_chat": True,
@@ -265,6 +287,8 @@ class Fixture:
             "closed": False, "poisoned": False, "slots": 1, "active": 0, "inflight": 0, "waiters": 0,
             "max_waiters": 8, "cache_entries": 0, "cache_bytes": 0, "cache_entries_limit": 0,
             "cache_bytes_limit": 1048576, **counts, "event_seq": seq, "adaptive": self.metadata()}
+        if s["schema_version"] == 2:
+            state["profiles"] = copy.deepcopy(s["profiles"])
         self.status_state = copy.deepcopy(state)
         event("close")
         state.update(closed=True, event_seq=seq)
@@ -588,6 +612,174 @@ class AdaptiveReplayTests(unittest.TestCase):
         imported = {node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)}
         imported |= {alias.name for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names}
         self.assertFalse(any(name and (name.startswith("cellivane_") or name.startswith("hosted")) for name in imported))
+
+
+class ProfileReplayTests(unittest.TestCase):
+    """V2 model selection is independently pinned; historical V1 stays strict."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.shared = tempfile.TemporaryDirectory()
+        cls.assets = SyntheticAssets(cls.shared.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.shared.cleanup()
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        for name, value in (("ARCHIVE_SHA", self.assets.archive_sha), ("MODEL_PINS", self.assets.pins)):
+            context = patch.object(v.spec, name, value)
+            context.start()
+            self.addCleanup(context.stop)
+        context = patch.object(v, "CATALOG", self.assets.catalog)
+        context.start()
+        self.addCleanup(context.stop)
+        self.f = Fixture(self.temp.name, self.assets, with_draft=False, target_profile="1.7b")
+
+    def test_all_three_v2_target_profiles_have_full_physical_replay(self):
+        for name in ("0.6b", "1.7b", "4b"):
+            with self.subTest(name=name):
+                fixture = Fixture(Path(self.temp.name) / name, self.assets, with_draft=False, target_profile=name)
+                result = fixture.replay()
+                self.assertEqual(result["outcome"], "PASS")
+                self.assertEqual(result["source_file_count"], 19)
+                self.assertEqual(result["selected_mode"], "none")
+
+    def test_explicit_draft_for_1_7b_and_4b_has_independent_dynamic_plans(self):
+        for name in ("1.7b", "4b"):
+            with self.subTest(name=name):
+                fixture = Fixture(Path(self.temp.name) / name, self.assets, "draft", "draft", "explicit-draft",
+                    target_profile=name)
+                self.assertEqual(fixture.replay()["selected_mode"], "draft")
+                required = fixture.phase["admission"]["ram_required_bytes"]
+                self.assertEqual(required, self.assets.catalog[name][1] + self.assets.catalog["0.6b"][1]
+                    + 2 * GIB + 512 * 1024**2)
+
+    def test_v1_remains_18_files_and_rejects_v2_profile_extension(self):
+        fixture = Fixture(Path(self.temp.name) / "v1", self.assets)
+        result = fixture.replay()
+        self.assertEqual(result["source_file_count"], 18)
+        fixture.summary["profiles"] = {"target": self.assets.profile("4b"), "draft": self.assets.profile("0.6b")}
+        with self.assertRaisesRegex(ValueError, "summary-fields"):
+            fixture.replay()
+
+    def test_v2_requires_profiles_and_exact_19_file_registry_source_family(self):
+        registry = "hosted/experimental/cellivane_seed/profiles.py"
+        digest_value = self.f.summary["source_sha256"].pop(registry)
+        with self.assertRaisesRegex(ValueError, "source-closure"):
+            self.f.replay()
+        self.f.summary["source_sha256"][registry] = digest_value
+        del self.f.summary["profiles"]
+        with self.assertRaisesRegex(ValueError, "summary-fields"):
+            self.f.replay()
+
+    def test_resealed_profile_swap_cannot_keep_old_model_record(self):
+        self.f.summary["profiles"]["target"] = self.assets.profile("0.6b")
+        self.f.reseal()
+        with self.assertRaisesRegex(ValueError, "model-pin"):
+            self.f.replay()
+
+    def test_resealed_profile_and_model_swap_cannot_keep_old_admission(self):
+        self.f.summary["profiles"]["target"] = self.assets.profile("0.6b")
+        self.f.summary["models"]["target"] = copy.deepcopy(self.assets.profile_models["0.6b"])
+        self.f.reseal()
+        with self.assertRaisesRegex(ValueError, "demand-configuration-or-workspace"):
+            self.f.replay()
+
+    def test_profile_metadata_is_exact_and_does_not_confer_qualification(self):
+        original = copy.deepcopy(self.f.summary["profiles"]["target"])
+        for changes in ({"schema_version": True}, {"bytes": True}, {"sha256": "f" * 64},
+                {"filename": "different.gguf"}, {"scope": "qualified-model"}, {"actual_backend_qualification": True}):
+            with self.subTest(changes=changes):
+                self.f.summary["profiles"]["target"] = {**original, **changes}
+                self.f.reseal()
+                with self.assertRaisesRegex(ValueError, "profile-catalog-binding"):
+                    self.f.replay()
+
+    def test_pinned_content_under_wrong_filename_is_rejected(self):
+        old_path = Path(self.f.summary["models"]["target"]["path"])
+        renamed = Path(self.temp.name) / "Qwen3-4B-Q8_0.gguf"
+        renamed.write_bytes(old_path.read_bytes())
+        self.f.summary["models"]["target"] = file_record(renamed)
+        self.f.phase["command"][2] = str(renamed)
+        self.f.reseal()
+        with self.assertRaisesRegex(ValueError, "profile-path-filename"):
+            self.f.replay()
+
+    def test_only_0_6b_draft_and_distinct_target_are_supported_pairs(self):
+        fixture = Fixture(Path(self.temp.name) / "same", self.assets, target_profile="0.6b")
+        with self.assertRaisesRegex(ValueError, "unsupported-profile-pair"):
+            fixture.replay()
+        fixture = Fixture(Path(self.temp.name) / "larger-draft", self.assets, target_profile="4b")
+        fixture.summary["profiles"]["draft"] = self.assets.profile("1.7b")
+        fixture.summary["models"]["draft"] = copy.deepcopy(self.assets.profile_models["1.7b"])
+        fixture.reseal()
+        with self.assertRaisesRegex(ValueError, "unsupported-profile-pair"):
+            fixture.replay()
+
+    def test_same_model_demand_is_rejected_after_plan_and_audit_resealing(self):
+        fixture = Fixture(Path(self.temp.name) / "draft", self.assets, "draft", "draft", "explicit-draft",
+            target_profile="1.7b")
+        plan = fixture.summary["choice"]["draft"]
+        plan["demand"].update(draft_sha256=plan["demand"]["target_sha256"], draft_bytes=plan["demand"]["target_bytes"])
+        plan["ram_required_bytes"] = sum(plan["demand"][name] for name in
+            ("target_bytes", "draft_bytes", "host_overhead_bytes", "context_workspace_bytes"))
+        fixture.phase.update(admission=plan, identity=digest(plan), demand=copy.deepcopy(plan["demand"]))
+        fixture.reseal()
+        with self.assertRaisesRegex(ValueError, "demand-configuration-or-workspace"):
+            fixture.replay()
+
+    def test_v2_status_and_shutdown_must_join_summary_profiles(self):
+        status = self.f.phase["status_response"]
+        status["body"]["profiles"]["target"] = self.assets.profile("4b")
+        status["raw_response"] = encode(status["body"]).decode()
+        with self.assertRaisesRegex(ValueError, "status-before-shutdown"):
+            self.f.replay()
+        self.f.reseal()
+        self.f.phase["state"]["profiles"]["target"] = self.assets.profile("4b")
+        self.f.records[-1]["value"] = copy.deepcopy(self.f.phase["state"])
+        self.f.write_chain()
+        with self.assertRaisesRegex(ValueError, "shutdown-state-or-counters"):
+            self.f.replay()
+
+    def test_4b_historical_calibration_does_not_qualify_1_7b_auto_draft(self):
+        fixture = Fixture(Path(self.temp.name) / "calibration", self.assets, policy="auto",
+            reason="calibration-identity-mismatch", target_profile="1.7b")
+        report = {"backend_assets": {"engine_identity": self.assets.engine},
+            "models": {"target": self.assets.profile_models["4b"], "draft": self.assets.profile_models["0.6b"]},
+            "configuration": copy.deepcopy(CONFIG)}
+        report_path = Path(self.temp.name) / "synthetic-historical-v1.json"
+        report_path.write_bytes(encode(report))
+        verdict = {"outcome": "PASS", "source_files_checked": True, "paired_total": 12,
+            "paired_text_equal": 12, "median_paired_wall_speed_ratio": 1.2, "speculation_observed": True}
+        validation = {"report": file_record(report_path), "source_root": self.temp.name,
+            "replay": verdict, "replay_sha256": digest(verdict)}
+        fixture.summary["calibration_validation"] = validation
+        fixture.summary["choice"]["calibration"] = {"schema_version": 1, "engine_identity": self.assets.engine,
+            "target_sha256": self.assets.profile_models["4b"]["sha256"],
+            "draft_sha256": self.assets.profile_models["0.6b"]["sha256"],
+            "settings_sha256": digest({name: CONFIG[name] for name in SETTINGS}),
+            "report_sha256": validation["report"]["sha256"], "replay_sha256": validation["replay_sha256"],
+            "paired_total": 12, "paired_text_equal": 12, "median_wall_ratio": 1.2, "speculation_observed": True,
+            "scope": "advisory-historical-calibration-not-current-host-qualification"}
+        fixture.reseal()
+        # The old reader boundary is isolated here; the complete physical/wire
+        # replay above and all adaptive identity decisions remain real readers.
+        with patch.object(v.spec, "replay", return_value=verdict):
+            self.assertEqual(fixture.replay()["reason"], "calibration-identity-mismatch")
+            fixture.summary["choice"].update(selected_mode="draft", reason="calibrated-advisory-benefit")
+            fixture.reseal()
+            with self.assertRaisesRegex(ValueError, "choice-independent"):
+                fixture.replay()
+
+    def test_v1_cannot_be_relabelled_v2_without_registry_and_metadata(self):
+        fixture = Fixture(Path(self.temp.name) / "v1", self.assets)
+        fixture.summary["schema_version"] = 2
+        fixture.summary["profiles"] = {"target": self.assets.profile("4b"), "draft": self.assets.profile("0.6b")}
+        with self.assertRaisesRegex(ValueError, "source-closure"):
+            fixture.replay()
 
 
 class CalibrationReplayTests(unittest.TestCase):

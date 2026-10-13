@@ -27,6 +27,7 @@ sys.path.insert(0, str(ROOT / "hosted" / "experimental"))
 import cellivane_seed_adaptive as launcher
 from cellivane_seed.adaptive import Calibration, StartupChoice, settings_identity
 from cellivane_seed.capabilities import BackendCapabilities
+from cellivane_seed.profiles import get_profile
 from cellivane_seed.resources import AdmissionPlan, ExecutionDemand, ResourceBudget
 from cellivane_seed.server import Audit, SeedHTTPServer
 
@@ -58,12 +59,13 @@ def completion():
 
 
 @contextmanager
-def serving(choice=None):
+def serving(choice=None, *, target_profile=None, draft_profile=None):
     with tempfile.TemporaryDirectory(prefix="cellivane-adaptive-http-fixture-") as folder:
         audit = Audit(folder)
         backend = mock.Mock(side_effect=lambda _: completion())
         chosen = declared_choice() if choice is None else choice
-        engine = launcher.BoundedSeedEngine(backend, choice=chosen, model="fixture",
+        engine = launcher.BoundedSeedEngine(backend, choice=chosen,
+            target_profile=target_profile, draft_profile=draft_profile, model="fixture",
             identity=chosen.selected.sha256, event_sink=lambda value: audit.append("scheduler", value))
         server = SeedHTTPServer(("127.0.0.1", 0), engine, audit)
         thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": .01}, daemon=True)
@@ -105,6 +107,48 @@ def pinned_calibration(config):
         draft_sha256=launcher.spec.MODELS["draft"]["sha256"], settings_sha256=settings_identity(config),
         report_sha256="1" * 64, replay_sha256="2" * 64, paired_total=8,
         paired_text_equal=8, median_wall_ratio=1.2, speculation_observed=True)
+
+
+def profile_models(target_name, *, draft=False):
+    target = get_profile(target_name)
+    result = {"target": {"bytes": target.bytes, "sha256": target.sha256}}
+    if draft:
+        small = get_profile("0.6b")
+        result["draft"] = {"bytes": small.bytes, "sha256": small.sha256}
+    return result
+
+
+@contextmanager
+def fake_pinned_metadata(path, profile, *, changed_after_hash=False, reparse=False, digest=None):
+    """Keep a real tiny regular file; fake only its known-size/hash observations.
+
+    The tiny fixture is not a valid GGUF. No positive artifact qualification is
+    claimed by these isolated checker control-flow tests.
+    """
+    original_stat, original_lstat = Path.stat, Path.lstat
+    hashed = False
+
+    def metadata(original, candidate, *args, **kwargs):
+        info = original(candidate, *args, **kwargs)
+        if candidate != path:
+            return info
+        return SimpleNamespace(st_mode=info.st_mode, st_size=profile.bytes,
+            st_mtime_ns=info.st_mtime_ns + (1 if changed_after_hash and hashed else 0),
+            st_ino=info.st_ino, st_file_attributes=0x400 if reparse else 0)
+
+    def file_sha(candidate):
+        nonlocal hashed
+        if candidate != path:
+            raise AssertionError("fixture checker hashed an unexpected path")
+        hashed = True
+        return profile.sha256 if digest is None else digest
+
+    with mock.patch.object(Path, "stat", lambda candidate, *args, **kwargs:
+            metadata(original_stat, candidate, *args, **kwargs)), \
+            mock.patch.object(Path, "lstat", lambda candidate, *args, **kwargs:
+                metadata(original_lstat, candidate, *args, **kwargs)), \
+            mock.patch.object(launcher.assets, "file_sha256", side_effect=file_sha) as hash_reader:
+        yield hash_reader
 
 
 def replay_result(**changes):
@@ -200,6 +244,35 @@ class AdaptiveFacadeTests(unittest.TestCase):
 
 
 class AdaptiveChooseTests(unittest.TestCase):
+    def test_each_explicit_target_keeps_its_own_demand_instead_of_silently_substituting(self):
+        prepared, _, config = pinned_inputs()
+        for name in ("0.6b", "1.7b", "4b"):
+            with self.subTest(name=name):
+                target = get_profile(name)
+                chosen = launcher.choose(prepared, profile_models(name), config,
+                    {"available_bytes": 32 * 1024**3}, policy="auto", expected_output_tokens=128, calibration=None)
+                self.assertEqual(chosen.decision()[0], "none")
+                self.assertEqual((chosen.selected.demand.target_sha256, chosen.selected.demand.target_bytes),
+                                 (target.sha256, target.bytes))
+        blocked = launcher.choose(prepared, profile_models("4b"), config,
+            {"available_bytes": 9 * 1024**3}, policy="auto", expected_output_tokens=128, calibration=None)
+        self.assertIsNone(blocked.selected)
+        self.assertEqual(blocked.baseline.demand.target_sha256, get_profile("4b").sha256)
+        fits = launcher.choose(prepared, profile_models("1.7b"), config,
+            {"available_bytes": 9 * 1024**3}, policy="auto", expected_output_tokens=128, calibration=None)
+        self.assertEqual(fits.decision()[0], "none")
+
+    def test_four_b_calibration_does_not_enable_new_one_point_seven_auto_draft(self):
+        prepared, _, config = pinned_inputs()
+        chosen = launcher.choose(prepared, profile_models("1.7b", draft=True), config,
+            {"available_bytes": 32 * 1024**3}, policy="auto", expected_output_tokens=128,
+            calibration=pinned_calibration(config))
+        self.assertEqual(chosen.decision(), ("none", "calibration-identity-mismatch"))
+        self.assertEqual(chosen.selected.demand.target_sha256, get_profile("1.7b").sha256)
+        explicit = replace(chosen, policy="draft", calibration=None)
+        self.assertEqual(explicit.decision()[0], "draft")
+        self.assertEqual(explicit.selected.demand.draft_sha256, get_profile("0.6b").sha256)
+
     def test_pinned_file_bytes_and_explicit_workspace_are_reserved_without_opening_models(self):
         prepared, models, config = pinned_inputs()
         available = 4 * 1024**3 + models["target"]["bytes"] + models["draft"]["bytes"] + 2 * 1024**3 + 512 * 1024**2
@@ -260,6 +333,101 @@ class AdaptiveChooseTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             launcher.choose(prepared, models, config, {"available_bytes": 32 * 1024**3},
                 policy="auto", expected_output_tokens=129, calibration=None)
+
+
+class AdaptiveProfileFileTests(unittest.TestCase):
+    def test_checker_accepts_exact_declared_metadata_for_each_profile_without_reading_real_weights(self):
+        for name in ("0.6b", "1.7b", "4b"):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                profile = get_profile(name)
+                path = Path(folder) / profile.filename
+                path.write_bytes(b"tiny metadata-only fixture, not a GGUF")
+                with fake_pinned_metadata(path, profile) as hash_reader:
+                    checked = launcher.checked_model(path, profile)
+                    hash_reader.assert_called_once_with(path)
+                self.assertEqual(checked, {"path": str(path.resolve(strict=True)),
+                                          "bytes": profile.bytes, "sha256": profile.sha256})
+
+    def test_wrong_filename_or_size_is_rejected_before_hash_reader(self):
+        profile = get_profile("1.7b")
+        with tempfile.TemporaryDirectory() as folder:
+            for filename in (profile.filename, get_profile("0.6b").filename):
+                path = Path(folder) / filename
+                path.write_bytes(b"not a model")
+                with self.subTest(filename=filename), mock.patch.object(launcher.assets, "file_sha256") as hash_reader:
+                    with self.assertRaisesRegex(ValueError, "model-profile-file"):
+                        launcher.checked_model(path, profile)
+                    hash_reader.assert_not_called()
+
+    def test_wrong_digest_reparse_or_posthash_metadata_change_is_rejected(self):
+        profile = get_profile("0.6b")
+        for options, reason in (({"digest": "9" * 64}, "pin-mismatch"),
+                                ({"reparse": True}, "pin-mismatch"),
+                                ({"changed_after_hash": True}, "changed-during-hash")):
+            with self.subTest(options=options), tempfile.TemporaryDirectory() as folder:
+                path = Path(folder) / profile.filename
+                path.write_bytes(b"not a model")
+                with fake_pinned_metadata(path, profile, **options) as hash_reader:
+                    with self.assertRaisesRegex(ValueError, reason):
+                        launcher.checked_model(path, profile)
+                    if options.get("reparse"):
+                        hash_reader.assert_not_called()
+
+    def test_checker_requires_exact_profile_and_revalidates_forced_pin_mutation(self):
+        for profile in (None, "4b", {}, True):
+            with self.subTest(profile=profile), self.assertRaisesRegex(ValueError, "exact-type"):
+                launcher.checked_model("unused.gguf", profile)
+        profile = replace(get_profile("4b"))
+        object.__setattr__(profile, "sha256", "9" * 64)
+        with self.assertRaisesRegex(ValueError, "model-profile-pin"):
+            launcher.checked_model("unused.gguf", profile)
+
+    def test_model_profile_derivation_rejects_unknown_or_unsupported_pairs(self):
+        for target in ("0.6b", "1.7b", "4b"):
+            self.assertEqual(launcher.model_profiles(profile_models(target)), (get_profile(target), None))
+        self.assertEqual(launcher.model_profiles(profile_models("1.7b", draft=True)),
+                         (get_profile("1.7b"), get_profile("0.6b")))
+        for models in (profile_models("0.6b", draft=True),
+                       {"target": profile_models("4b")["target"], "draft": profile_models("1.7b")["target"]},
+                       {"target": {"bytes": 1, "sha256": "9" * 64}}):
+            with self.subTest(models=models), self.assertRaises(ValueError):
+                launcher.model_profiles(models)
+
+    def test_public_profile_status_is_demand_bound_and_path_free(self):
+        prepared, _, config = pinned_inputs()
+        chosen = launcher.choose(prepared, profile_models("1.7b", draft=True), config,
+            {"available_bytes": 32 * 1024**3}, policy="auto", expected_output_tokens=128, calibration=None)
+        target, draft = get_profile("1.7b"), get_profile("0.6b")
+        with serving(chosen, target_profile=target, draft_profile=draft) as (server, _, audit, backend, _):
+            status, state = exchange(server, "/v1/status")
+            self.assertEqual(status, 200)
+            self.assertEqual(state["profiles"], {"target": target.record(), "draft": draft.record()})
+            self.assertEqual(state["adaptive"]["mode"], "none")
+            self.assertNotIn(str(audit.directory.parent), json.dumps(state))
+            self.assertNotIn("audit_directory", state)
+            backend.assert_not_called()
+
+    def test_profile_facade_cannot_rebind_target_or_omit_declared_draft(self):
+        prepared, _, config = pinned_inputs()
+        baseline = launcher.choose(prepared, profile_models("1.7b"), config,
+            {"available_bytes": 32 * 1024**3}, policy="none", expected_output_tokens=128, calibration=None)
+        with_draft = launcher.choose(prepared, profile_models("1.7b", draft=True), config,
+            {"available_bytes": 32 * 1024**3}, policy="none", expected_output_tokens=128, calibration=None)
+        backend = mock.Mock()
+        for chosen, target, draft in ((baseline, get_profile("4b"), None),
+                                      (baseline, get_profile("1.7b"), get_profile("0.6b")),
+                                      (with_draft, get_profile("1.7b"), None),
+                                      (with_draft, None, get_profile("0.6b"))):
+            with self.subTest(target=target, draft=draft), self.assertRaises(ValueError):
+                launcher.BoundedSeedEngine(backend, choice=chosen, target_profile=target,
+                    draft_profile=draft, model="fixture", identity=chosen.selected.sha256)
+        backend.assert_not_called()
+
+    def test_profiles_extend_only_adaptive_source_closure(self):
+        profile_source = "hosted/experimental/cellivane_seed/profiles.py"
+        self.assertIn(profile_source, launcher.SOURCE_PATHS)
+        self.assertEqual(len(launcher.SOURCE_PATHS), 19)
+        self.assertNotIn(profile_source, launcher.spec.SOURCE_PATHS)
 
 
 class CalibrationLoaderTests(unittest.TestCase):
@@ -350,6 +518,82 @@ class CalibrationLoaderTests(unittest.TestCase):
 
 
 class AdaptivePlanCLITests(unittest.TestCase):
+    def test_explicit_target_profiles_are_recorded_in_schema_two_without_downgrade(self):
+        prepared, _, _ = pinned_inputs()
+        for name in ("0.6b", "1.7b", "4b"):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                target = get_profile(name)
+                models = profile_models(name)
+                with mock.patch.object(launcher, "os", SimpleNamespace(name="nt")), \
+                        mock.patch.object(launcher, "source_hashes", return_value={}), \
+                        mock.patch.object(launcher, "snapshot_sources"), \
+                        mock.patch.object(launcher, "validate_inputs"), \
+                        mock.patch.object(launcher.assets, "prepare_assets", return_value=prepared), \
+                        mock.patch.object(launcher, "checked_model", return_value=models["target"]) as checker, \
+                        mock.patch.object(launcher.spec, "memory_snapshot", return_value={"available_bytes": 32 * 1024**3}), \
+                        mock.patch.object(launcher.lab, "OwnedProcess") as owned, \
+                        mock.patch("builtins.print") as printed:
+                    target_file = Path(folder) / target.filename
+                    code = launcher.main(["--mode", "plan", "--target-profile", name, "--asset-root", folder,
+                        "--target-file", str(target_file), "--storage-root", folder])
+                self.assertEqual(code, 0)
+                checker.assert_called_once_with(str(target_file), target)
+                owned.assert_not_called()
+                receipt = json.loads(printed.call_args.args[0])
+                saved = json.loads(Path(receipt["summary"]).read_bytes())
+                self.assertEqual(saved["schema_version"], 2)
+                self.assertEqual(saved["profiles"], {"target": target.record(), "draft": None})
+                self.assertEqual(saved["choice"]["selected_mode"], "none")
+                self.assertEqual(saved["choice"]["baseline"]["demand"]["target_sha256"], target.sha256)
+                self.assertEqual(saved["choice"]["baseline"]["demand"]["target_bytes"], target.bytes)
+
+    def test_wrong_file_pin_fails_smoke_before_inspection_or_owned_process(self):
+        prepared, _, _ = pinned_inputs()
+        with tempfile.TemporaryDirectory() as folder:
+            target = get_profile("1.7b")
+            target_file = Path(folder) / target.filename
+            target_file.write_bytes(b"intentionally wrong size, not a GGUF")
+            with mock.patch.object(launcher, "os", SimpleNamespace(name="nt")), \
+                    mock.patch.object(launcher, "source_hashes", return_value={}), \
+                    mock.patch.object(launcher, "snapshot_sources"), \
+                    mock.patch.object(launcher.assets, "prepare_assets", return_value=prepared), \
+                    mock.patch.object(launcher.assets, "file_sha256") as hash_reader, \
+                    mock.patch.object(launcher.spec, "inspect_backend") as inspection, \
+                    mock.patch.object(launcher.lab, "OwnedProcess") as owned, \
+                    mock.patch.object(launcher, "run_selected") as run_selected, \
+                    mock.patch("builtins.print") as printed:
+                code = launcher.main(["--mode", "smoke", "--target-profile", "1.7b", "--asset-root", folder,
+                    "--target-file", str(target_file), "--storage-root", folder])
+            self.assertEqual(code, 2)
+            hash_reader.assert_not_called()
+            inspection.assert_not_called()
+            owned.assert_not_called()
+            run_selected.assert_not_called()
+            receipt = json.loads(printed.call_args.args[0])
+            self.assertEqual(receipt["outcome"], "FAIL")
+            self.assertIn("model-profile-file-pin-mismatch:1.7b", receipt["error"])
+
+    def test_same_point_six_target_and_draft_fail_before_checker_or_child(self):
+        prepared, _, _ = pinned_inputs()
+        with tempfile.TemporaryDirectory() as folder:
+            with mock.patch.object(launcher, "os", SimpleNamespace(name="nt")), \
+                    mock.patch.object(launcher, "source_hashes", return_value={}), \
+                    mock.patch.object(launcher, "snapshot_sources"), \
+                    mock.patch.object(launcher.assets, "prepare_assets", return_value=prepared), \
+                    mock.patch.object(launcher, "checked_model") as checker, \
+                    mock.patch.object(launcher.spec, "inspect_backend") as inspection, \
+                    mock.patch.object(launcher.lab, "OwnedProcess") as owned, \
+                    mock.patch.object(launcher, "run_selected") as run_selected, \
+                    mock.patch("builtins.print") as printed:
+                code = launcher.main(["--mode", "smoke", "--target-profile", "0.6b", "--asset-root", folder,
+                    "--target-file", "not-opened-target.gguf", "--draft-file", "not-opened-draft.gguf", "--storage-root", folder])
+            self.assertEqual(code, 2)
+            checker.assert_not_called()
+            inspection.assert_not_called()
+            owned.assert_not_called()
+            run_selected.assert_not_called()
+            self.assertIn("draft-pair-unsupported", json.loads(printed.call_args.args[0])["error"])
+
     def test_plan_uses_fresh_ram_and_never_dispatches_owned_process_for_admitted_or_blocked_choice(self):
         prepared, models, _ = pinned_inputs()
         for available, expected_outcome, expected_code in ((32 * 1024**3, "PLANNED", 0), (1024**3, "BLOCKED", 2)):
@@ -360,7 +604,7 @@ class AdaptivePlanCLITests(unittest.TestCase):
                         mock.patch.object(launcher, "validate_inputs"), \
                         mock.patch.object(launcher, "load_calibration", return_value=(None, None)), \
                         mock.patch.object(launcher.assets, "prepare_assets", return_value=prepared), \
-                        mock.patch.object(launcher.spec, "checked_model", return_value=models["target"]), \
+                        mock.patch.object(launcher, "checked_model", return_value=models["target"]), \
                         mock.patch.object(launcher.spec, "memory_snapshot", return_value={"available_bytes": available}) as snapshot, \
                         mock.patch.object(launcher.lab, "OwnedProcess") as owned, \
                         mock.patch.object(launcher.spec, "inspect_backend") as inspect_backend, \
@@ -379,6 +623,8 @@ class AdaptivePlanCLITests(unittest.TestCase):
                 self.assertIs(outputs[0]["backend_dispatched"], False)
                 self.assertEqual(outputs[-1]["outcome"], expected_outcome)
                 saved = json.loads(Path(outputs[-1]["summary"]).read_bytes())
+                self.assertEqual(saved["schema_version"], 2)
+                self.assertEqual(saved["profiles"], {"target": get_profile("4b").record(), "draft": None})
                 self.assertEqual(saved["outcome"], expected_outcome)
                 self.assertEqual(saved["choice"]["baseline"]["budget"]["ram_available_bytes"], available)
                 self.assertIsNone(saved["phase"])
