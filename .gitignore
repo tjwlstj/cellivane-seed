@@ -18,6 +18,8 @@ htmlcov/
 /seed-runs/
 /lab-runs/
 /compare-runs/
+/speculation-runs/
+/adaptive-runs/
 /owned-profile/
 /ollama-models/
 /build/

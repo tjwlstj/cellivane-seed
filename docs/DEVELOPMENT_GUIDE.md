@@ -1,7 +1,7 @@
 # Cellivane Seed development guide
 
 Document role: active workflow and bounded-experiment guide. Reviewed
-2026-10-12 against the standalone source and its current architecture.
+2026-10-13 against the standalone source and its current architecture.
 This review is not a new model run, regression verdict or release approval.
 The project remains **PARTIAL / experimental**.
 
@@ -17,6 +17,7 @@ own native Kernel Room identity, principal authorization or resource apply.
 |---|---|
 | What exists and how to run it? | [README](../README.md) and the actual CLI |
 | Runtime responsibility, admission and failure contracts | [ARCHITECTURE](ARCHITECTURE.md) and current runtime source |
+| Session capacity, status, shutdown, restart and private evidence | [OPERATIONS](OPERATIONS.md) |
 | Upstream pins, artifact hashes and license boundaries | [UPSTREAM](UPSTREAM.md) |
 | Accepted model/placement measurements and their limits | [BENCHMARKS](BENCHMARKS.md) and its allowlisted aggregate |
 | Work selection, contract/budget procedure and current experiment gates | This guide |
@@ -166,6 +167,11 @@ launch, network request or model execution in this command.
 <a id="current-slice-contract-budget-and-speculation"></a>
 
 ## Current slice: contract, budget and speculation
+
+This section retains the recorded contract/budget/speculation slice that
+predates adaptive startup. Its source digests and 385-test local result are
+historical evidence; [the operating/startup follow-up](#operating-and-startup-selection-follow-up)
+below owns the new source and acceptance results.
 
 The approved direction is a small contract/budget planning surface followed
 by a real speculative-decoding OFF/ON experiment. The preflight surface is
@@ -361,6 +367,78 @@ Publish only the intended reviewed files after the relevant local gates.
 Use beta first and check terminal CI for the exact published revision;
 historical green CI does not cover later source. Moving main requires the
 user's separate explicit instruction and the same verified beta revision.
+
+## Historical CI and current-source validation
+
+The following terminal GitHub runs describe their exact source revisions,
+not the working tree after them. The jobs use synthetic/loopback/process
+fixtures; they do not execute the real model experiments.
+
+| Published revision | Terminal CI evidence | Interpretation |
+|---|---|---|
+| [5f19faf](https://github.com/tjwlstj/cellivane-seed/commit/5f19faf9479ff487be041d94695d4b78fe07816d) | [Initial public CI](https://github.com/tjwlstj/cellivane-seed/actions/runs/38191543178): Windows and Ubuntu success, 175 collected each; Ubuntu 15 skipped | Original smoke/export only |
+| [c22a29d](https://github.com/tjwlstj/cellivane-seed/commit/c22a29d90fcf26a1378ad92c1fb31f044b1a33c1) | [CI 38203515952](https://github.com/tjwlstj/cellivane-seed/actions/runs/38203515952): Windows success; Ubuntu failure | A synthetic lifecycle test entered the Windows-only launcher gate |
+| [e763cec](https://github.com/tjwlstj/cellivane-seed/commit/e763cec58686511c35ac1039917902db50f2cc07) | [CI 38203636107](https://github.com/tjwlstj/cellivane-seed/actions/runs/38203636107): both success, 385 collected each; Windows 0 skipped, Ubuntu 15 skipped | Fixture selects the Windows branch with a local mock without changing pathlib's host OS |
+
+The c22a29d failure and e763cec fix concern a mocked control-flow test, not
+Ubuntu model execution. The local 385-test Windows run and the accepted CPU
+speculation report remain their own evidence records. New audit/status or
+startup-selector code requires new affected regressions and exact-revision
+CI after publication; none of these historical links validates later bytes.
+Do not predict a future commit's CI success in its own source documentation.
+
+## Operating and startup-selection follow-up
+
+[OPERATIONS](OPERATIONS.md) owns audit limits, capacity monitoring, deadline
+semantics and new-session handling. Session restart does not restore cache
+or recover an old audit, and per-session limits do not cap accumulated disk use.
+The path-free audit status snapshot is implemented in current source, with
+per-session limits, the shared append/snapshot lock and an 80% warning.
+Its failure/threshold regressions passed 24 tests, separate from the
+historical CI above.
+
+The [adaptive policy](../hosted/experimental/cellivane_seed/adaptive.py) and
+[launcher](../tools/hosted/cellivane_seed_adaptive.py) are **CURRENT** as source
+implementation, with 24 pure policy fixtures passed. Actual auto baseline and
+calibrated draft functional smoke both passed independent recorded-evidence
+replay against eighteen runtime/launcher source files and four frozen verifier
+files. Their source snapshots remain separate from the historical calibration.
+The [allowlisted aggregate](benchmarks/2026-10-13-adaptive-summary.json) owns the
+new report/verdict/source hashes and supported claims. Launcher fixtures passed
+18 tests; independent replay fixtures passed 35. The final local Windows suite
+passed **467 tests / zero skips / 42.739 seconds**. Its raw regression log stays
+private. These results do not establish new Ubuntu actual-model execution or
+terminal CI success for a future publication. Check the matching commit in the
+[beta workflow](https://github.com/tjwlstj/cellivane-seed/actions/workflows/tests.yml?query=branch%3Abeta).
+The first supported profile is fixed official Qwen3-4B Q8_0 target with optional
+0.6B Q8_0 draft, Windows CPU b11429, context 2048, four threads, one slot,
+cache zero and a 128-token HTTP cap. Do not expand this to generic GGUF support.
+
+Independently replay raw calibration and its retained matching source before
+choosing the startup mode, then refresh declared RAM admission before one owned
+server launch. The auto policy chooses baseline when calibration is absent.
+Expected output length is a caller's workload hint. Historical speed ratio,
+text equality or speculation counters are advisory evidence for that recorded
+model/source configuration, not a current-host guarantee. The pinned backend
+does not permit per-request switching. Record fallback to `none`, rejection,
+source snapshot, status, cleanup and new independent results explicitly.
+[OPERATIONS](OPERATIONS.md#adaptive-startup-selection) owns the runnable
+baseline/draft commands and the precise CLI and policy bounds.
+
+Each independently replayed smoke had one warmup plus four computed HTTP
+responses, 129-token HTTP rejection before additional dispatch, nineteen audit
+records and recorded zero-active owned Job/port cleanup. Calibrated draft had
+148 offered / 122 accepted tokens including warmup; uncalibrated baseline had
+zero of both. This is functional startup selection, not a new paired-speed
+or quality comparison. A supplemental thirty-second serve run completed an
+external HTTP request and cleanup, outside the five-request smoke replay
+contract. A short-output plan selected baseline without child dispatch.
+
+Use Python CLI as the primary invocation. The optional PowerShell wrapper
+passed static AST checks but `-File` was blocked by the test host's existing
+execution policy; it is not a tested policy-independent execution path.
+Do not change system execution policy or add a blanket bypass to make a
+documentation command appear verified.
 
 ## Upstream and public evidence boundary
 

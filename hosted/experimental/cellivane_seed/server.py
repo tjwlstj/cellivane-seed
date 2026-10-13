@@ -26,13 +26,37 @@ class Audit:
 
     This is an integrity chain, not authentication or power-loss recovery proof.
     Raw wire records can contain user text; storage stays in the local run folder.
+    Limits and the 80% warning apply to this session; no automatic rotation.
     """
+    RECORD_LIMIT = 10000
+    BYTE_LIMIT = 64 * 1024 * 1024
+    WARNING_THRESHOLD_PERCENT = 80
+
     def __init__(self, root):
-        self.directory = local_root(local_root(root) / "seed-runs") / str(uuid4())
+        self.session_id = str(uuid4())
+        self.directory = local_root(local_root(root) / "seed-runs") / self.session_id
         self.directory.mkdir()
         self.lock = threading.Lock()
         self.sequence, self.previous, self.poisoned = 0, None, False
         self.bytes = 0
+
+    def status(self):
+        """Path-free committed usage; warn at >=80% of either per-session limit.
+
+        Bytes count encoded records, not filesystem allocation. This snapshot
+        neither reserves append capacity nor rotates or recovers an old run.
+        """
+        with self.lock:
+            return {"session_id": self.session_id,
+                    "records": self.sequence, "bytes": self.bytes,
+                    "record_limit": self.RECORD_LIMIT, "byte_limit": self.BYTE_LIMIT,
+                    "remaining_records": max(0, self.RECORD_LIMIT - self.sequence),
+                    "remaining_bytes": max(0, self.BYTE_LIMIT - self.bytes),
+                    "warning_threshold_percent": self.WARNING_THRESHOLD_PERCENT,
+                    "near_capacity": (
+                        self.sequence * 100 >= self.RECORD_LIMIT * self.WARNING_THRESHOLD_PERCENT
+                        or self.bytes * 100 >= self.BYTE_LIMIT * self.WARNING_THRESHOLD_PERCENT),
+                    "poisoned": self.poisoned}
 
     def append(self, kind, value):
         with self.lock:
@@ -42,7 +66,7 @@ class Audit:
                       "kind": kind, "value": value}
             raw = encoded(record)
             try:
-                if self.sequence >= 10000 or self.bytes + len(raw) > 64 * 1024 * 1024:
+                if self.sequence >= self.RECORD_LIMIT or self.bytes + len(raw) > self.BYTE_LIMIT:
                     raise OSError("audit-capacity-exhausted")
                 path = self.directory / (f"{self.sequence + 1:06d}.json")
                 with path.open("xb") as stream:
@@ -148,7 +172,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         state = self.server.engine.status()
         if self.path == "/health":
-            okay = not state["closed"] and not state["poisoned"]
+            okay = (not state["closed"] and not state["poisoned"]
+                    and not self.server.audit.status()["poisoned"])
             self.reply(200 if okay else 503, {"status": "ok" if okay else "unavailable",
                         "service": "cellivane-seed", "scope": "serving-admission-only"})
         elif self.path == "/v1/models":
@@ -158,7 +183,7 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(200, {**state, "tensor_backend": "external-openai-subset",
                         "token_mtp": False, "kv_sharing": False,
                         "canonical_main_binding": False,
-                        "audit_directory": str(self.server.audit.directory)})
+                        "audit": self.server.audit.status()})
         else:
             self.reply(404, {"error": {"message": "route-not-supported"}})
 

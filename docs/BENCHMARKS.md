@@ -15,6 +15,17 @@ explicit sixteen-file family; that change does not refresh these historical
 run hashes or validate new source. The separate draft/target experiment is
 documented in [SPECULATION.md](SPECULATION.md).
 
+Keep the experiments separate: this page uses twelve cases twice through
+Ollama CPU/GPU placement profiles. The draft/target result uses four tasks
+three times per mode on CPU only. Its paired wall-time ratio of 1.1974 is
+not a GPU result or a metric from this twelve-case corpus.
+
+The separate [adaptive startup path](OPERATIONS.md#adaptive-startup-selection)
+is implemented; baseline/draft functional smoke and independent recorded-evidence
+replay passed. Its [aggregate](benchmarks/2026-10-13-adaptive-summary.json)
+records functional selection, not a new paired speed/quality comparison.
+It does not refresh these historical run hashes, scores or placement measurements.
+
 ## Question and scope
 
 The experiment asks whether the same small serving layer can run three
@@ -169,9 +180,15 @@ The comparison's `--asset-root` is the engine cache; `--model-file` is the
 GGUF path; `--storage-root` is a separate local directory for private runs.
 
 ```powershell
-py -3 -B tools/hosted/cellivane_seed_assets.py --model 1.7b --storage-root D:/AIOS/cellivane-seed-models-20261012
-py -3 -B tools/hosted/cellivane_seed_compare.py --model 1.7b --model-file D:/AIOS/cellivane-seed-models-20261012/models/Qwen3-1.7B-Q8_0.gguf --asset-root D:/AIOS/cellivane-bridge-20261009 --storage-root D:/AIOS/cellivane-seed-models-20261012 --profile cpu --repeat 2
+$modelRoot = Join-Path $env:LOCALAPPDATA 'Cellivane/seed-models'
+$engineAssets = Join-Path $env:LOCALAPPDATA 'Cellivane/bridge-lab'
+py -3 -B tools/hosted/cellivane_seed_assets.py --model 1.7b --storage-root $modelRoot
+py -3 -B tools/hosted/cellivane_seed_compare.py --model 1.7b --model-file "$modelRoot/models/Qwen3-1.7B-Q8_0.gguf" --asset-root $engineAssets --storage-root $modelRoot --profile cpu --repeat 2
 ```
+
+These variables use the README's local Windows defaults. They may point to
+D: or another supported local fixed disk instead; the engine cache must
+already be prepared. See [OPERATIONS](OPERATIONS.md) for session and storage limits.
 
 Use `--model 4b` with its matching model file for the larger artifact.
 `--profile hybrid --layers 14` requests partial offload;
@@ -183,7 +200,9 @@ private evidence; they are not unit tests or the original CPU smoke mode.
 To replay the saved report without executing a model:
 
 ```powershell
-py -3 -B tools/hosted/verify_cellivane_comparison.py /absolute/path/to/comparison.json --source-root /absolute/path/to/matching-source
+$comparison = Read-Host 'Saved comparison.json path'
+$matchingSource = Read-Host 'Exact matching source checkout or snapshot directory'
+py -3 -B tools/hosted/verify_cellivane_comparison.py $comparison --source-root $matchingSource
 ```
 
 The [comparison verifier](../tools/hosted/verify_cellivane_comparison.py)

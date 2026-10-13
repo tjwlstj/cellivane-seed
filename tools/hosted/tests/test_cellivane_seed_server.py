@@ -18,6 +18,7 @@ import threading
 import time
 import unittest
 from unittest import mock
+from uuid import UUID
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "hosted" / "experimental"))
@@ -125,7 +126,130 @@ class SeedServerTests(unittest.TestCase):
             self.assertFalse(state["kv_sharing"])
             self.assertFalse(state["canonical_main_binding"])
             self.assertEqual(state["backend_calls"], 0)
-            self.assertEqual(Path(state["audit_directory"]), audit.directory)
+            self.assertNotIn("audit_directory", state)
+            self.assertEqual(state["audit"], audit.status())
+            self.assertEqual(str(UUID(state["audit"]["session_id"])), audit.directory.name)
+            self.assertEqual(UUID(state["audit"]["session_id"]).version, 4)
+            self.assertNotIn(str(audit.directory), json.dumps(state))
+            self.assertNotIn(str(audit.directory.parent), json.dumps(state))
+            self.assertEqual(state["audit"]["records"], 0)
+            self.assertEqual(state["audit"]["bytes"], 0)
+            self.assertEqual(state["audit"]["remaining_records"], 10000)
+            self.assertEqual(state["audit"]["remaining_bytes"], 64 * 1024 * 1024)
+            self.assertFalse(state["audit"]["near_capacity"])
+            self.assertFalse(state["audit"]["poisoned"])
+
+    def test_audit_warning_is_inclusive_at_eighty_percent_of_either_limit(self):
+        # Seed committed counters at the boundary so this fixture does not need
+        # 8,000 fsync calls or a 52 MiB record. The final append is real.
+        for metric, limit in (("records", 10000), ("bytes", 64 * 1024 * 1024)):
+            threshold = (limit * 80 + 99) // 100
+            for offset in (-1, 0):
+                with self.subTest(metric=metric, offset=offset), tempfile.TemporaryDirectory() as folder:
+                    audit = Audit(folder)
+                    value = {"boundary_fixture": True}
+                    if metric == "records":
+                        audit.sequence = threshold + offset - 1
+                    else:
+                        raw = encoded({"seq": 1, "previous_sha256": None,
+                                       "kind": "fixture", "value": value})
+                        audit.bytes = threshold + offset - len(raw)
+                    audit.append("fixture", value)
+                    state = audit.status()
+                    self.assertEqual(state[metric], threshold + offset)
+                    self.assertEqual(state["warning_threshold_percent"], 80)
+                    self.assertIs(state["near_capacity"], offset == 0)
+                    self.assertFalse(state["poisoned"])
+                    remaining = "remaining_records" if metric == "records" else "remaining_bytes"
+                    self.assertEqual(state[remaining], limit - threshold - offset)
+
+    def test_http_warning_does_not_close_admission_and_status_reads_do_not_write(self):
+        with serving() as (server, engine, audit):
+            audit.sequence = 7999
+            audit.append("fixture", {"boundary_fixture": True})
+            files = {path.name: path.read_bytes() for path in audit.directory.iterdir()}
+            for _ in range(2):
+                status, _, state = wire(server, path="/v1/status")
+                self.assertEqual(status, 200)
+                self.assertTrue(state["audit"]["near_capacity"])
+                self.assertEqual(state["audit"]["remaining_records"], 2000)
+                self.assertFalse(state["audit"]["poisoned"])
+                self.assertEqual(wire(server)[0], 200)
+            self.assertEqual(audit.status()["records"], 8000)
+            self.assertEqual({path.name: path.read_bytes() for path in audit.directory.iterdir()}, files)
+            self.assertEqual(engine.status()["backend_calls"], 0)
+
+    def test_audit_snapshot_waits_for_durable_append_or_poison_transition(self):
+        original_fsync = seed_server.os.fsync
+        for fail in (False, True):
+            with self.subTest(fail=fail), tempfile.TemporaryDirectory() as folder:
+                audit = Audit(folder)
+                entered, release = threading.Event(), threading.Event()
+                observing, observed = threading.Event(), threading.Event()
+                errors, snapshots = [], []
+
+                def fsync(descriptor):
+                    entered.set()
+                    if not release.wait(2):
+                        raise RuntimeError("fixture-gate-timeout")
+                    if fail:
+                        raise OSError("fixture-durability-failure")
+                    original_fsync(descriptor)
+
+                def append():
+                    try:
+                        audit.append("fixture", {"actual_model_qualification": False})
+                    except OSError as error:
+                        errors.append(str(error))
+
+                def observe():
+                    observing.set()
+                    snapshots.append(audit.status())
+                    observed.set()
+
+                writer = threading.Thread(target=append)
+                reader = threading.Thread(target=observe)
+                with mock.patch.object(seed_server.os, "fsync", side_effect=fsync):
+                    writer.start()
+                    try:
+                        self.assertTrue(entered.wait(2))
+                        reader.start()
+                        self.assertTrue(observing.wait(2))
+                        self.assertFalse(observed.wait(.05))
+                    finally:
+                        release.set()
+                        writer.join(2)
+                        if reader.ident is not None:
+                            reader.join(2)
+                self.assertFalse(writer.is_alive())
+                self.assertFalse(reader.is_alive())
+                self.assertEqual(snapshots, [audit.status()])
+                self.assertIs(snapshots[0]["poisoned"], fail)
+                self.assertEqual(snapshots[0]["records"], 0 if fail else 1)
+                if fail:
+                    self.assertEqual(errors, ["fixture-durability-failure"])
+                    self.assertEqual(snapshots[0]["bytes"], 0)
+                else:
+                    self.assertEqual(errors, [])
+                    raw = (audit.directory / "000001.json").read_bytes()
+                    self.assertEqual(snapshots[0]["bytes"], len(raw))
+                    self.assertEqual(audit.previous, hashlib.sha256(raw).hexdigest())
+
+    def test_new_audit_session_preserves_old_run_without_recovery_or_rotation(self):
+        with tempfile.TemporaryDirectory() as folder:
+            old = Audit(folder)
+            old.append("fixture", {"actual_model_qualification": False})
+            raw = (old.directory / "000001.json").read_bytes()
+            old.sequence = 10000
+            with self.assertRaisesRegex(OSError, "audit-capacity-exhausted"):
+                old.append("fixture", {})
+            fresh = Audit(folder)
+            self.assertNotEqual(fresh.status()["session_id"], old.status()["session_id"])
+            self.assertEqual((fresh.status()["records"], fresh.status()["bytes"]), (0, 0))
+            self.assertFalse(fresh.status()["poisoned"])
+            self.assertTrue(old.status()["poisoned"])
+            self.assertEqual((old.directory / "000001.json").read_bytes(), raw)
+            self.assertEqual(set(fresh.directory.iterdir()), set())
 
     def test_actual_bridge_transport_and_parser_accept_fixture_protocol(self):
         calls = []
@@ -330,6 +454,23 @@ class SeedServerTests(unittest.TestCase):
             self.assert_error(post(server, payload("next")), 503)
             self.assertEqual(wire(server)[0], 503)
 
+    def test_audit_only_failure_is_unhealthy_before_next_engine_admission(self):
+        with serving() as (server, engine, audit):
+            with mock.patch("cellivane_seed.server.os.fsync", side_effect=OSError("fixture-disk-failure")):
+                with self.assertRaisesRegex(OSError, "fixture-disk-failure"):
+                    audit.append("fixture", {"actual_model_qualification": False})
+            # No scheduler operation has propagated Audit's failure into the
+            # engine yet. Health must still refuse to advertise admission.
+            self.assertFalse(engine.status()["poisoned"])
+            self.assertFalse(engine.status()["closed"])
+            self.assertEqual(wire(server)[0], 503)
+            status, _, state = wire(server, path="/v1/status")
+            self.assertEqual(status, 200)
+            self.assertTrue(state["audit"]["poisoned"])
+            self.assertEqual(state["audit"]["records"], 0)
+            self.assert_error(post(server), 503)
+            self.assertEqual(engine.status()["backend_calls"], 0)
+
     def test_audit_record_and_byte_capacity_poison_before_another_file_is_written(self):
         for exhausted in ("records", "bytes"):
             with self.subTest(exhausted=exhausted), tempfile.TemporaryDirectory() as folder:
@@ -350,12 +491,36 @@ class SeedServerTests(unittest.TestCase):
                     audit.append("fixture", {})
 
     def test_audit_capacity_rejection_fences_http_backend_admission(self):
-        with serving() as (server, engine, audit):
-            audit.bytes = 64 * 1024 * 1024
-            self.assert_error(post(server), 503)
-            self.assertTrue(audit.poisoned)
-            self.assertTrue(engine.status()["poisoned"])
-            self.assertEqual(engine.status()["backend_calls"], 0)
+        for full in ("records", "bytes"):
+            with self.subTest(full=full), serving() as (server, engine, audit):
+                value = {"exact_capacity_fixture": True}
+                if full == "records":
+                    audit.sequence = 9999
+                else:
+                    raw = encoded({"seq": 1, "previous_sha256": None,
+                                   "kind": "fixture", "value": value})
+                    audit.bytes = 64 * 1024 * 1024 - len(raw)
+                audit.append("fixture", value)
+                _, _, state = wire(server, path="/v1/status")
+                remaining = "remaining_records" if full == "records" else "remaining_bytes"
+                self.assertEqual(state["audit"][remaining], 0)
+                self.assertTrue(state["audit"]["near_capacity"])
+                self.assertFalse(state["audit"]["poisoned"])
+                self.assertEqual(wire(server)[0], 200)
+                files = {path.name: path.read_bytes() for path in audit.directory.iterdir()}
+                self.assert_error(post(server), 503)
+                self.assertTrue(audit.poisoned)
+                self.assertTrue(engine.status()["poisoned"])
+                self.assertEqual(engine.status()["backend_calls"], 0)
+                self.assertEqual(wire(server)[0], 503)
+                status, _, state = wire(server, path="/v1/status")
+                self.assertEqual(status, 200)
+                self.assertTrue(state["audit"]["poisoned"])
+                self.assertEqual(state["audit"][remaining], 0)
+                self.assertNotIn("audit_directory", state)
+                self.assertEqual(wire(server, path="/v1/models")[0], 200)
+                self.assert_error(post(server, payload("later")), 503)
+                self.assertEqual({path.name: path.read_bytes() for path in audit.directory.iterdir()}, files)
 
     def test_standalone_main_closes_http_server_even_if_engine_close_raises(self):
         engine = mock.Mock()
@@ -366,11 +531,14 @@ class SeedServerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             with mock.patch.object(seed_server, "probe", return_value={"outcome": "CONFIRMED"}), \
                     mock.patch.object(seed_server, "SeedEngine", return_value=engine), \
-                    mock.patch.object(seed_server, "SeedHTTPServer", return_value=server), \
-                    mock.patch("builtins.print"):
+                    mock.patch.object(seed_server, "SeedHTTPServer", return_value=server) as server_constructor, \
+                    mock.patch("builtins.print") as printed:
                 with self.assertRaises(EngineUnavailable):
                     seed_server.main(["--port", "18941", "--backend-url", "http://127.0.0.1:18942/v1",
                                       "--model", "tiny", "--identity", "fixture-only", "--storage-root", folder])
+                ready = json.loads(printed.call_args.args[0])
+                self.assertTrue(ready["ready"])
+                self.assertEqual(Path(ready["audit_directory"]), server_constructor.call_args.args[2].directory)
         server.server_close.assert_called_once_with()
 
 

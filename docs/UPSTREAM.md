@@ -186,9 +186,14 @@ File fsync is not a power-loss qualification. The destination must support
 same-volume hard links; failure preserves the verified partial for review.
 
 ```powershell
-py -3 -B tools/hosted/cellivane_seed_assets.py --model 1.7b --storage-root D:/AIOS/cellivane-seed-models-20261012
-py -3 -B tools/hosted/cellivane_seed_assets.py --model 4b --storage-root D:/AIOS/cellivane-seed-models-20261012
+$modelRoot = Join-Path $env:LOCALAPPDATA 'Cellivane/seed-models'
+py -3 -B tools/hosted/cellivane_seed_assets.py --model 1.7b --storage-root $modelRoot
+py -3 -B tools/hosted/cellivane_seed_assets.py --model 4b --storage-root $modelRoot
 ```
+
+Set `$modelRoot` to another local fixed disk when needed, including D:.
+Asset download/storage and engine preparation are explicit operations;
+[OPERATIONS](OPERATIONS.md) explains private evidence and accumulated disk use.
 
 Downloading and verifying weights does not execute or qualify them. This
 tool does not install llamafile, Ollama, CUDA or any driver. The older
@@ -199,3 +204,12 @@ take that verified engine cache as `--asset-root` and the new GGUF as
 
 For current responsibility and maturity boundaries, see
 [ARCHITECTURE.md](ARCHITECTURE.md).
+
+The implemented adaptive startup path uses only the existing b11429 CPU
+binary and official 4B target / optional 0.6B draft pins above. No new
+upstream code or artifact pin is introduced. Auto baseline and calibrated
+draft functional smoke and matching-source independent replay passed. The
+historical speculation result is advisory calibration,
+not current-host qualification. The [new aggregate](benchmarks/2026-10-13-adaptive-summary.json)
+records the eighteen runtime/launcher and four verifier hashes separately.
+See [OPERATIONS](OPERATIONS.md#adaptive-startup-selection).

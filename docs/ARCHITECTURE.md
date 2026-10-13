@@ -1,6 +1,6 @@
 # Cellivane Seed architecture
 
-Status: **PARTIAL / experimental**. Reviewed 2026-10-12. This standalone
+Status: **PARTIAL / experimental**. Reviewed 2026-10-13. This standalone
 Python project owns local request admission, completed-result reuse and
 reference/subengine comparison. An external engine owns token computation.
 It does not implement a native kernel, tensor kernels or model training.
@@ -77,12 +77,28 @@ owner result returned after its deadline, but Python cannot interrupt an
 arbitrary blocked callable. Logical usage copied into a cached completion
 does not mean those tokens were recomputed on that hit.
 
+The attached CLI's standard strict HTTP transport has a 90-second deadline
+and bounded body reads. That transport enforces its own remaining I/O time;
+it does not make arbitrary Python callables preemptible. Subscriber timeout,
+client disconnect, request completion and model-process shutdown are separate
+facts. A blocking custom callable can retain its compute slot and delay shutdown.
+
 Audit writes are serialized and poison admission on persistence failure.
 They use exclusive records and file fsync. This is not power-loss or
 filesystem crash-recovery qualification. Owned Windows launchers use Job
 Objects and retained process handles; checking an empty port and observing
 an owned process start still does not independently bind that process to
 every response received at the endpoint.
+
+Each audit session is limited to 10,000 records and 64 MiB of serialized
+record bytes. An append that would exceed either limit poisons the audit;
+records are events, not a guaranteed number of user requests. A fresh process
+creates a new session without restoring the previous cache or in-flight work.
+Old evidence remains, and accumulated sessions/logs have no automatic disk
+quota or retention policy. See [OPERATIONS](OPERATIONS.md) for near-capacity
+monitoring and failure handling. The current `/v1/status` has a path-free
+audit snapshot under the same audit lock, with an 80% record-or-byte warning.
+The audit/status regressions passed 24 tests; earlier CI does not cover this change.
 
 ## A small hardware-plan surface
 
@@ -242,3 +258,31 @@ published revision separately from these local results;
 the [development guide](DEVELOPMENT_GUIDE.md#current-slice-contract-budget-and-speculation)
 owns that acceptance boundary. Earlier comparison PASS results do not
 validate this changed source or extend this bounded speculation result.
+
+## CPU startup selection
+
+The [startup policy](../hosted/experimental/cellivane_seed/adaptive.py) and
+[launcher](../tools/hosted/cellivane_seed_adaptive.py) are implemented
+**CURRENT**, with 24 pure policy fixtures passed. Actual functional smoke and
+independent recorded-evidence replay passed for auto baseline and calibrated
+draft, with matching eighteen-file runtime/launcher source. The final local
+Windows suite passed 467 tests with zero skips in 42.739 seconds. The product
+remains PARTIAL; published CI is a separate exact-revision check.
+The first fixed profile is Qwen3-4B Q8_0 target / optional 0.6B Q8_0 draft,
+pinned llama.cpp b11429, Windows CPU, context 2048, four threads, one slot,
+cache disabled and at most 128 generated tokens. The Seed HTTP gate rejects
+larger `max_tokens` before backend dispatch. It is not a generic model adapter.
+
+An independently replayed raw calibration can inform a startup choice between
+`none` and `draft`, followed by fresh declared RAM admission and one owned
+server. Missing calibration chooses baseline in `auto`. Expected output length
+is a caller's workload hint, not a prediction or performance guarantee.
+The pinned backend's request handler does not support changing this speculative
+mode between live requests. [OPERATIONS](OPERATIONS.md#adaptive-startup-selection)
+owns exact policy inputs, fallback reasons and commands. Per-request switching,
+general auto-tuning, arbitrary callable interruption and recovery of persisted
+execution remain outside the contract. Older experimental PASS results do
+not validate this follow-up. The [adaptive aggregate](benchmarks/2026-10-13-adaptive-summary.json)
+records functional selection, bounded dispatch and cleanup, not a new paired
+speed or quality comparison. The supplemental 30-second serve check is outside
+the five-request smoke replay contract.
